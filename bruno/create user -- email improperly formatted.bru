@@ -1,0 +1,26 @@
+meta {
+  name: create user -- email improperly formatted
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://localhost:3000/users
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email": "cool-guy"
+  }
+}
+
+assert {
+  res.status: eq 422
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
