@@ -7,4 +7,8 @@ pub(crate) struct CreateUserRequest {
 pub(crate) enum CreateUserError {
     #[error("Email improperly formatted")]
     EmailImproperlyFormatted(),
+    #[error("User already exists")]
+    UserAlreadyExists(),
+    #[error("Internal Error: {0}")]
+    Internal(String)
 }

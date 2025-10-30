@@ -32,6 +32,12 @@ async fn create_user(
             types::dao::CreateUserError::EmailImproperlyFormatted() => {
                 http::StatusCode::UNPROCESSABLE_ENTITY
             }
+            types::dao::CreateUserError::UserAlreadyExists() => {
+                http::StatusCode::CONFLICT
+            }
+            types::dao::CreateUserError::Internal(_) => {
+                http::StatusCode::INTERNAL_SERVER_ERROR
+            }
         },
     }
 }
