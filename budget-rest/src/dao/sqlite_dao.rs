@@ -16,11 +16,15 @@ impl Dao for SqliteDao {
         println!("Attempting to create db: {}", email_sha);
         std::fs::create_dir_all("dbs")
             .map_err(|e| types::dao::CreateUserError::Internal(e.to_string()))?;
-        let file = std::fs::OpenOptions::new().write(true)
+        let sqlite_file_path = format!("dbs/{}.db", email_sha);
+        let sqlite_file = std::fs::OpenOptions::new().write(true)
             .create_new(true)
-            .open(format!("dbs/{}.db", email_sha));
-        match file {
+            .open(sqlite_file_path.clone());
+        match sqlite_file {
             Ok(_) => {
+                let conn = rusqlite::Connection::open(sqlite_file_path).expect("Failed to open checked sqlite db");
+                let ddl = std::fs::read_to_string("dbs/USER_DDL.sql").unwrap();
+                conn.execute(ddl.as_str(), ()).unwrap();
                 Ok(())
             }
             Err(e) => {

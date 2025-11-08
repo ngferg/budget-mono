@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 axum = "0.8.6"
+rusqlite = "0.37.0"
 serde = { version = "1.0.228", features = ["serde_derive", "derive"] }
 sha256 = "1.6.0"
 thiserror = "2.0.17"
