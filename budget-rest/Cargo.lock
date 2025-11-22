@@ -109,6 +109,7 @@ dependencies = [
  "chrono",
  "rusqlite",
  "serde",
+ "serde_json",
  "sha256",
  "thiserror",
  "tokio",

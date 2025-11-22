@@ -1,13 +1,13 @@
 mod dao;
 mod types;
 
-use axum::{Router, http, routing::get};
+use axum::{http, routing::get, Router};
 
 #[tokio::main]
 async fn main() {
     // our router
     let app = Router::new()
-        .route("/", get(root))
+        .route("/health", get(health))
         .route("/users", get(get_users).post(create_user));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -15,10 +15,19 @@ async fn main() {
 }
 
 // which calls one of these handlers
-async fn root() {
-    println!("hello");
+async fn health() -> (http::StatusCode, axum::Json<serde_json::Value>) {
+    println!("Performing health check...");
+    let healthy = r#"
+    {
+      "status": "healthy"
+    }
+    "#;
+    let json = serde_json::from_str(healthy).unwrap_or_default();
+    (http::StatusCode::OK, axum::Json(json))
 }
+
 async fn get_users() {}
+
 async fn create_user(
     axum::extract::Json(req): axum::extract::Json<types::dao::CreateUserRequest>,
 ) -> http::StatusCode {
@@ -32,12 +41,8 @@ async fn create_user(
             types::dao::CreateUserError::EmailImproperlyFormatted() => {
                 http::StatusCode::UNPROCESSABLE_ENTITY
             }
-            types::dao::CreateUserError::UserAlreadyExists() => {
-                http::StatusCode::CONFLICT
-            }
-            types::dao::CreateUserError::Internal(_) => {
-                http::StatusCode::INTERNAL_SERVER_ERROR
-            }
+            types::dao::CreateUserError::UserAlreadyExists() => http::StatusCode::CONFLICT,
+            types::dao::CreateUserError::Internal(_) => http::StatusCode::INTERNAL_SERVER_ERROR,
         },
     }
 }
