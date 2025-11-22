@@ -28,7 +28,7 @@ impl Dao for SqliteDao {
                     .expect("Failed to open checked sqlite db");
 
                 let ddl = std::fs::read_to_string("dbs/USER_DDL.sql").expect("DDL sql is missing");
-                conn.execute(ddl.as_str(), ()).unwrap();
+                conn.execute_batch(ddl.as_str()).unwrap();
 
                 let current_date = chrono::Local::now();
                 let year = current_date.year();
