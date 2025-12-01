@@ -10,7 +10,20 @@ pub enum CreateUserError {
     Internal(String),
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum DeleteUserError {
+    #[error("User doesn't exists")]
+    UserDoesntExists(),
+    #[error("Internal Error: {0}")]
+    Internal(String),
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct CreateUserRequest {
+    pub email: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct DeleteUserRequest {
     pub email: String,
 }

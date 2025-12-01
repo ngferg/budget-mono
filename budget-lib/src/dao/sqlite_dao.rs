@@ -2,18 +2,19 @@ use crate::dao::Dao;
 use crate::types;
 use chrono::Datelike;
 
-pub(crate) struct SqliteDao {}
+pub(crate) struct SqliteDao {
+    db_folder: String,
+}
 
 impl Dao for SqliteDao {
     fn create_user(&self, req: &types::CreateUserRequest) -> Result<(), types::CreateUserError> {
         println!("Got a request to create a user: {}", req.email);
-        let db_folder = std::env::var("SQLITE_DB_PATH").expect("SQLITE_DB_PATH env var not set");
         if !req.email.contains("@") {
             return Err(types::CreateUserError::EmailImproperlyFormatted());
         }
         let email_sha = sha256::digest(req.email.clone());
         println!("Attempting to create db: {}", email_sha);
-        let sqlite_file_path = format!("{}/{}.db", db_folder, email_sha);
+        let sqlite_file_path = format!("{}/{}.db", self.db_folder, email_sha);
         let sqlite_file = std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -23,7 +24,7 @@ impl Dao for SqliteDao {
                 let conn = rusqlite::Connection::open(sqlite_file_path)
                     .expect("Failed to open checked sqlite db");
 
-                let ddl = std::fs::read_to_string(format!("{}/USER_DDL.sql", db_folder))
+                let ddl = std::fs::read_to_string(format!("{}/USER_DDL.sql", self.db_folder))
                     .expect("DDL sql is missing");
                 conn.execute_batch(ddl.as_str()).unwrap();
 
@@ -47,10 +48,30 @@ impl Dao for SqliteDao {
             }
         }
     }
+
+    fn delete_user(&self, req: &types::DeleteUserRequest) -> Result<(), types::DeleteUserError> {
+        println!("Got a request to delte user: {}", req.email);
+        let email_sha = sha256::digest(req.email.clone());
+        println!("Attempting to delete db: {}", email_sha);
+        let sqlite_file_path = format!("{}/{}.db", self.db_folder, email_sha);
+        let res = std::fs::remove_file(sqlite_file_path);
+        match res {
+            Ok(_) => Ok(()),
+            Err(e) => Err(types::DeleteUserError::Internal(e.to_string())),
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub(crate) enum DaoError {
+    #[error("Failed to insantiate DAO: {0}")]
+    FailedToCreate(String),
 }
 
 impl SqliteDao {
-    pub(crate) fn new() -> Self {
-        SqliteDao {}
+    pub(crate) fn try_new() -> Result<Self, DaoError> {
+        let db_folder = std::env::var("SQLITE_DB_PATH")
+            .map_err(|_| DaoError::FailedToCreate("SQLITE_DB_PATH env var not set".to_string()))?;
+        Ok(SqliteDao { db_folder })
     }
 }

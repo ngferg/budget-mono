@@ -3,9 +3,10 @@ use axum::{http, routing::get, Router};
 #[tokio::main]
 async fn main() {
     // our router
-    let app = Router::new()
-        .route("/health", get(health))
-        .route("/users", get(get_users).post(create_user));
+    let app = Router::new().route("/health", get(health)).route(
+        "/users",
+        get(get_users).post(create_user).delete(delete_user),
+    );
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
@@ -40,5 +41,15 @@ async fn create_user(
                 http::StatusCode::INTERNAL_SERVER_ERROR
             }
         },
+    }
+}
+
+async fn delete_user(
+    axum::extract::Json(req): axum::extract::Json<budget_lib::types::DeleteUserRequest>,
+) -> http::StatusCode {
+    let res = budget_lib::delete_user(req).await;
+    match res {
+        Ok(()) => http::StatusCode::NO_CONTENT,
+        Err(_) => http::StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
