@@ -1,0 +1,15 @@
+
+.PHONY: clean-dbs
+clean-dbs:
+	rm -rf budget-lib/dbs/*.db
+
+.PHONY: run-rest-fresh
+run-rest-fresh:
+	make clean-dbs
+	cd budget-rest
+	SQLITE_DB_PATH="budget-lib/dbs" cargo run
+
+.PHONY: run-rest
+run-rest:
+	cd budget-rest
+	SQLITE_DB_PATH="budget-lib/dbs" cargo run

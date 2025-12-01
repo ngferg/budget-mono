@@ -1,6 +1,3 @@
-mod dao;
-mod types;
-
 use axum::{http, routing::get, Router};
 
 #[tokio::main]
@@ -29,20 +26,19 @@ async fn health() -> (http::StatusCode, axum::Json<serde_json::Value>) {
 async fn get_users() {}
 
 async fn create_user(
-    axum::extract::Json(req): axum::extract::Json<types::dao::CreateUserRequest>,
+    axum::extract::Json(req): axum::extract::Json<budget_lib::types::CreateUserRequest>,
 ) -> http::StatusCode {
-    use dao::Dao as dao_trait;
-
-    let dao = dao::sqlite_dao::SqliteDao::new();
-    let res = dao.create_user(&req);
+    let res = budget_lib::create_user(req).await;
     match res {
         Ok(()) => http::StatusCode::CREATED,
         Err(e) => match e {
-            types::dao::CreateUserError::EmailImproperlyFormatted() => {
+            budget_lib::types::CreateUserError::EmailImproperlyFormatted() => {
                 http::StatusCode::UNPROCESSABLE_ENTITY
             }
-            types::dao::CreateUserError::UserAlreadyExists() => http::StatusCode::CONFLICT,
-            types::dao::CreateUserError::Internal(_) => http::StatusCode::INTERNAL_SERVER_ERROR,
+            budget_lib::types::CreateUserError::UserAlreadyExists() => http::StatusCode::CONFLICT,
+            budget_lib::types::CreateUserError::Internal(_) => {
+                http::StatusCode::INTERNAL_SERVER_ERROR
+            }
         },
     }
 }

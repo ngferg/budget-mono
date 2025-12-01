@@ -1,14 +1,16 @@
-#[derive(Debug, serde::Deserialize)]
-pub(crate) struct CreateUserRequest {
-    pub email: String,
-}
+pub(crate) mod dao;
 
 #[derive(thiserror::Error, Debug)]
-pub(crate) enum CreateUserError {
+pub enum CreateUserError {
     #[error("Email improperly formatted")]
     EmailImproperlyFormatted(),
     #[error("User already exists")]
     UserAlreadyExists(),
     #[error("Internal Error: {0}")]
-    Internal(String)
+    Internal(String),
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct CreateUserRequest {
+    pub email: String,
 }
