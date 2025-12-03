@@ -93,13 +93,43 @@ impl Dao for SqliteDao {
         let categories = category_iter
             .collect::<Result<Vec<types::Category>, _>>()
             .map_err(|e| {
-                types::GetBudgetError::Internal(format!("Failed to query category tables {}", e))
+                types::GetBudgetError::Internal(format!("Failed to query category table {}", e))
             })?;
 
-        Ok(types::GetBudgetResponse {
-            categories,
-            budget: std::collections::HashMap::new(),
-        })
+        let mut budget = std::collections::HashMap::new();
+        categories.iter().for_each(|cat| {
+            budget.insert(cat.id, vec![]);
+        });
+
+        let mut budget_stmt = conn
+            .prepare("SELECT * FROM line_items WHERE budget_year = ? AND budget_month = ?")
+            .map_err(|_| {
+                types::GetBudgetError::Internal("Failed to select line_items".to_string())
+            })?;
+        let budget_iter = budget_stmt
+            .query_map(rusqlite::params![req.year, req.month], |row| {
+                Ok(types::LineItem {
+                    id: row.get(0)?,
+                    description: row.get(1)?,
+                    amount: row.get(2)?,
+                    category: row.get(3)?,
+                })
+            })
+            .map_err(|e| {
+                types::GetBudgetError::Internal(format!("Failed to query line_item table {}", e))
+            })?;
+        let line_items = budget_iter
+            .collect::<Result<Vec<types::LineItem>, _>>()
+            .map_err(|e| {
+                types::GetBudgetError::Internal(format!("Failed to query line_item table {}", e))
+            })?;
+        line_items.into_iter().for_each(|li| {
+            if let Some(lis) = budget.get_mut(&li.category) {
+                lis.push(li);
+            }
+        });
+
+        Ok(types::GetBudgetResponse { categories, budget })
     }
 }
 

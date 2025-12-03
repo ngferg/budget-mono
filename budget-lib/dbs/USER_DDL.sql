@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS budget (
     PRIMARY KEY (year, month)
 );
 
-CREATE TABLE IF NOT EXISTS line_item (
+CREATE TABLE IF NOT EXISTS line_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   description TEXT,
   amount INTEGER,
@@ -30,11 +30,11 @@ CREATE TABLE IF NOT EXISTS line_item (
   FOREIGN KEY(budget_year, budget_month) REFERENCES budget(year, month)
 );
 
-INSERT INTO line_item
+INSERT INTO line_items
   (amount, description, category, budget_year, budget_month)
 VALUES
-  (100000, "Rent", 2, 2025, 12),
-  (15000, "Electric", 1, 2025, 12),
-  (200000, "First paycheck", 0, 2025, 12),
-  (200000, "Second paycheck", 0, 2025, 12);
+  (100000, "Rent", 3, 2025, 12),
+  (15000, "Electric", 2, 2025, 12),
+  (200000, "First paycheck", 1, 2025, 12),
+  (200000, "Second paycheck", 1, 2025, 12);
 
