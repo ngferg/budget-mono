@@ -60,6 +60,47 @@ impl Dao for SqliteDao {
             Err(e) => Err(types::DeleteUserError::Internal(e.to_string())),
         }
     }
+
+    fn get_budget(
+        &self,
+        req: &types::GetBudgetRequest,
+    ) -> Result<types::GetBudgetResponse, types::GetBudgetError> {
+        println!("Got a request to fetch budget: {:?}", req);
+        let email_sha = sha256::digest(req.email.clone());
+        let sqlite_file_path = format!("{}/{}.db", self.db_folder, email_sha);
+        if !std::path::Path::new(&sqlite_file_path).exists() {
+            return Err(types::GetBudgetError::UserDoesntExists());
+        }
+        let conn = rusqlite::Connection::open(sqlite_file_path)
+            .map_err(|_| types::GetBudgetError::UserDoesntExists())?;
+        let mut category_stmt = conn.prepare("SELECT * FROM categories").map_err(|_| {
+            types::GetBudgetError::Internal("Failed to select categories".to_string())
+        })?;
+        let category_iter = category_stmt
+            .query_map(rusqlite::params![], |row| {
+                Ok(types::Category {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    category_type: match row.get(2)? {
+                        true => types::CategoryType::Expense,
+                        false => types::CategoryType::Income,
+                    },
+                })
+            })
+            .map_err(|_| {
+                types::GetBudgetError::Internal("Failed to query category tables".to_string())
+            })?;
+        let categories = category_iter
+            .collect::<Result<Vec<types::Category>, _>>()
+            .map_err(|e| {
+                types::GetBudgetError::Internal(format!("Failed to query category tables {}", e))
+            })?;
+
+        Ok(types::GetBudgetResponse {
+            categories,
+            budget: std::collections::HashMap::new(),
+        })
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

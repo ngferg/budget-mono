@@ -1,0 +1,29 @@
+meta {
+  name: find budget
+  type: http
+  seq: 6
+}
+
+post {
+  url: http://localhost:3000/users/budget
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email": "cool-guy@example.com",
+    "year": 2025,
+    "month": 12
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.categories: isArray
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

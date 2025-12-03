@@ -1,12 +1,16 @@
-use axum::{http, routing::get, Router};
+use axum::{
+    http,
+    routing::{get, post},
+    Router,
+};
 
 #[tokio::main]
 async fn main() {
     // our router
-    let app = Router::new().route("/health", get(health)).route(
-        "/users",
-        get(get_users).post(create_user).delete(delete_user),
-    );
+    let app = Router::new()
+        .route("/health", get(health))
+        .route("/users", post(create_user).delete(delete_user))
+        .route("/users/budget", post(find_budget));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
@@ -24,7 +28,31 @@ async fn health() -> (http::StatusCode, axum::Json<serde_json::Value>) {
     (http::StatusCode::OK, axum::Json(json))
 }
 
-async fn get_users() {}
+async fn find_budget(
+    axum::extract::Json(req): axum::extract::Json<budget_lib::types::GetBudgetRequest>,
+) -> (http::StatusCode, axum::Json<serde_json::Value>) {
+    let res = budget_lib::get_budget(req).await;
+    match res {
+        Ok(res) => (
+            http::StatusCode::OK,
+            axum::Json(serde_json::to_value(res).expect("json conversion should work")),
+        ),
+        Err(e) => match e {
+            budget_lib::types::GetBudgetError::Internal(e) => (
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::to_value(e).expect("json conversion should work")),
+            ),
+            budget_lib::types::GetBudgetError::UserDoesntExists() => (
+                http::StatusCode::NOT_FOUND,
+                axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+            ),
+            budget_lib::types::GetBudgetError::BudgetDoesntExists() => (
+                http::StatusCode::NOT_FOUND,
+                axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+            ),
+        },
+    }
+}
 
 async fn create_user(
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::CreateUserRequest>,
