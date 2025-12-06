@@ -8,8 +8,15 @@ run-rest-fresh:
 	make clean-dbs
 	cd budget-rest
 	SQLITE_DB_PATH="budget-lib/dbs" cargo run
+	cd -
 
 .PHONY: run-rest
 run-rest:
 	cd budget-rest
 	SQLITE_DB_PATH="budget-lib/dbs" cargo run
+	cd -
+
+.PHONY: run-dev-webapp
+run-dev-webapp:
+	npm run dev --prefix ./budget-web-app/
+

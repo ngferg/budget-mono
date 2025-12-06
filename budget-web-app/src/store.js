@@ -7,4 +7,7 @@ export const store = reactive({
     this.is_logged_in = true;
     this.email = email;
   },
+  get_email() {
+    return this.email;
+  }
 });
