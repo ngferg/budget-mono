@@ -1,6 +1,5 @@
 use crate::dao::Dao;
 use crate::types;
-use chrono::Datelike;
 
 pub(crate) struct SqliteDao {
     db_folder: String,
@@ -27,19 +26,6 @@ impl Dao for SqliteDao {
                 let ddl = std::fs::read_to_string(format!("{}/USER_DDL.sql", self.db_folder))
                     .expect("DDL sql is missing");
                 conn.execute_batch(ddl.as_str()).unwrap();
-
-                let current_date = chrono::Local::now();
-                let year = current_date.year();
-                let month = current_date.month();
-                conn.execute(
-                    format!(
-                        "INSERT INTO budget (year, month) VALUES ({}, {})",
-                        year, month
-                    )
-                    .as_str(),
-                    (),
-                )
-                .unwrap();
                 Ok(())
             }
             Err(e) => {

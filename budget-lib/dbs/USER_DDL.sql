@@ -30,11 +30,14 @@ CREATE TABLE IF NOT EXISTS line_items (
   FOREIGN KEY(budget_year, budget_month) REFERENCES budget(year, month)
 );
 
-INSERT INTO line_items
-  (amount, description, category, budget_year, budget_month)
-VALUES
-  (100000, "Rent", 3, 2025, 12),
-  (15000, "Electric", 2, 2025, 12),
-  (200000, "First paycheck", 1, 2025, 12),
-  (200000, "Second paycheck", 1, 2025, 12);
+INSERT INTO budget (year, month) VALUES (STRFTIME('%Y','now'), STRFTIME('%m','now'));
 
+WITH vars AS (
+  SELECT STRFTIME('%Y','now') AS current_year,
+         STRFTIME('%m','now') AS current_month
+)
+INSERT INTO line_items (amount, description, category, budget_year, budget_month)
+SELECT 100000, 'Rent', 3, current_year, current_month FROM vars
+UNION ALL SELECT 15000, 'Electric', 2, current_year, current_month FROM vars
+UNION ALL SELECT 200000, 'First paycheck', 1, current_year, current_month FROM vars
+UNION ALL SELECT 200000, 'Second paycheck', 1, current_year, current_month FROM vars;
