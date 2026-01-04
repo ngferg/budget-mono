@@ -52,12 +52,8 @@ impl Dao for SqliteDao {
         req: &types::DeleteLineItemRequest,
     ) -> Result<(), types::DeleteLineItemError> {
         println!("Got a request to delete line item: {:?}", req);
-        let email_sha = sha256::digest(req.email.clone());
-        let sqlite_file_path = format!("{}/{}.db", self.db_folder, email_sha);
-        if !std::path::Path::new(&sqlite_file_path).exists() {
-            return Err(types::DeleteLineItemError::UserDoesntExists());
-        }
-        let conn = rusqlite::Connection::open(sqlite_file_path)
+        let conn = self
+            .get_conn(req.email.clone())
             .map_err(|_| types::DeleteLineItemError::UserDoesntExists())?;
         let mut delete_stmt = conn
             .prepare("DELETE FROM line_items WHERE budget_year = ? AND budget_month = ? and id = ?")
@@ -80,12 +76,8 @@ impl Dao for SqliteDao {
         req: &types::GetBudgetRequest,
     ) -> Result<types::GetBudgetResponse, types::GetBudgetError> {
         println!("Got a request to fetch budget: {:?}", req);
-        let email_sha = sha256::digest(req.email.clone());
-        let sqlite_file_path = format!("{}/{}.db", self.db_folder, email_sha);
-        if !std::path::Path::new(&sqlite_file_path).exists() {
-            return Err(types::GetBudgetError::UserDoesntExists());
-        }
-        let conn = rusqlite::Connection::open(sqlite_file_path)
+        let conn = self
+            .get_conn(req.email.clone())
             .map_err(|_| types::GetBudgetError::UserDoesntExists())?;
         let mut category_stmt = conn.prepare("SELECT * FROM categories").map_err(|_| {
             types::GetBudgetError::Internal("Failed to select categories".to_string())
@@ -151,6 +143,8 @@ impl Dao for SqliteDao {
 pub(crate) enum DaoError {
     #[error("Failed to insantiate DAO: {0}")]
     FailedToCreate(String),
+    #[error("DB doesn't exists")]
+    DbDoesntExist(),
 }
 
 impl SqliteDao {
@@ -158,5 +152,16 @@ impl SqliteDao {
         let db_folder = std::env::var("SQLITE_DB_PATH")
             .map_err(|_| DaoError::FailedToCreate("SQLITE_DB_PATH env var not set".to_string()))?;
         Ok(SqliteDao { db_folder })
+    }
+
+    fn get_conn(&self, email: String) -> Result<rusqlite::Connection, DaoError> {
+        let email_sha = sha256::digest(email.clone());
+        let sqlite_file_path = format!("{}/{}.db", self.db_folder, email_sha);
+        if !std::path::Path::new(&sqlite_file_path).exists() {
+            return Err(DaoError::DbDoesntExist());
+        }
+        let conn =
+            rusqlite::Connection::open(sqlite_file_path).map_err(|_| DaoError::DbDoesntExist())?;
+        Ok(conn)
     }
 }
