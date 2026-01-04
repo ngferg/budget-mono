@@ -37,7 +37,7 @@ WITH vars AS (
          STRFTIME('%m','now') AS current_month
 )
 INSERT INTO line_items (amount, description, category, budget_year, budget_month)
-SELECT 100000, 'Rent', 3, current_year, current_month FROM vars
-UNION ALL SELECT 15000, 'Electric', 2, current_year, current_month FROM vars
+SELECT 100000, 'Rent', 2, current_year, current_month FROM vars
+UNION ALL SELECT 15000, 'Electric', 3, current_year, current_month FROM vars
 UNION ALL SELECT 200000, 'First paycheck', 1, current_year, current_month FROM vars
 UNION ALL SELECT 200000, 'Second paycheck', 1, current_year, current_month FROM vars;
