@@ -25,6 +25,18 @@ pub async fn delete_user(
     Ok(())
 }
 
+pub async fn delete_line_item(
+    del_line_item_request: types::DeleteLineItemRequest,
+) -> Result<(), types::DeleteLineItemError> {
+    use dao::Dao as dao_trait;
+
+    let dao = dao::sqlite_dao::SqliteDao::try_new()
+        .inspect_err(|e| eprintln!("Failed to create sqlite dao: {}", e.to_string()))
+        .unwrap();
+    let _ = dao.delete_line_item(&del_line_item_request)?;
+    Ok(())
+}
+
 pub async fn get_budget(
     get_budget_request: types::GetBudgetRequest,
 ) -> Result<types::GetBudgetResponse, types::GetBudgetError> {

@@ -1,7 +1,6 @@
 use axum::{
-    http,
-    routing::{get, post},
-    Router,
+    Router, http,
+    routing::{delete, get, post},
 };
 
 #[tokio::main]
@@ -10,7 +9,8 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(health))
         .route("/users", post(create_user).delete(delete_user))
-        .route("/users/budget", post(find_budget));
+        .route("/users/budget", post(find_budget))
+        .route("/users/budget/line_item", delete(delete_line_item));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
@@ -79,5 +79,25 @@ async fn delete_user(
     match res {
         Ok(()) => http::StatusCode::NO_CONTENT,
         Err(_) => http::StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+async fn delete_line_item(
+    axum::extract::Json(req): axum::extract::Json<budget_lib::types::DeleteLineItemRequest>,
+) -> http::StatusCode {
+    let res = budget_lib::delete_line_item(req).await;
+    match res {
+        Ok(()) => http::StatusCode::NO_CONTENT,
+        Err(e) => match e {
+            budget_lib::types::DeleteLineItemError::UserDoesntExists() => {
+                http::StatusCode::NOT_FOUND
+            }
+            budget_lib::types::DeleteLineItemError::LineItemDoesntExist() => {
+                http::StatusCode::NOT_FOUND
+            }
+            budget_lib::types::DeleteLineItemError::Internal(_) => {
+                http::StatusCode::INTERNAL_SERVER_ERROR
+            }
+        },
     }
 }

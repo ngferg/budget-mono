@@ -23,11 +23,8 @@ const get_budget = async () => {
     });
     if (resp.status === 200) {
       const j = await resp.json();
-      console.log(j);
       budget.value = j.budget;
       categories.value = j.categories;
-      console.log(budget.value);
-      console.log(categories.value);
     } else {
       error.value = "Error: " + resp.status;
     }
@@ -44,6 +41,30 @@ const formatCents = (cents) => {
   if (typeof cents !== 'number' || Number.isNaN(cents)) return '$0.00';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
 };
+
+const delete_line_item = async (item_id) => {
+  try {
+    const resp = await fetch('/api/users/budget/line_item', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        'email': store.get_email(),
+        'year': year.value,
+        'month': month.value,
+        'item_id': item_id,
+      })
+    });
+    if (resp.status === 204) {
+      await get_budget();
+    } else {
+      error.value = "Error: " + resp.status;
+    }
+  } catch (e) {
+    error.value = "Error: " + resp.status;
+  }
+}
 </script>
 
 <template>
@@ -61,7 +82,7 @@ const formatCents = (cents) => {
         {{ category.name }}: {{formatCents(budget[category.id].map(item => item.amount).reduce((a, c) => a + c, 0))}}
         <ul>
           <li v-for="item in budget[category.id]" :key="item.id">
-            {{ item.description }} - {{ formatCents(item.amount) }}
+            {{ item.description }}: {{ formatCents(item.amount) }} <button @click="delete_line_item(item.id)">-</button>
           </li>
         </ul>
       </h4>

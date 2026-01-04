@@ -1,11 +1,11 @@
 meta {
-  name: find budget
+  name: delete line item
   type: http
-  seq: 6
+  seq: 7
 }
 
-post {
-  url: http://localhost:3000/users/budget
+delete {
+  url: http://localhost:3000/users/budget/line_item
   body: json
   auth: inherit
 }
@@ -14,13 +14,13 @@ body:json {
   {
     "email": "cool-guy@example.com",
     "year": 2026,
-    "month": 1
+    "month": 1,
+    "item_id": 3
   }
 }
 
 assert {
-  res.status: eq 200
-  res.body.categories: isArray
+  res.status: eq 204
 }
 
 settings {

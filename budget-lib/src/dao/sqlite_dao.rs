@@ -47,6 +47,34 @@ impl Dao for SqliteDao {
         }
     }
 
+    fn delete_line_item(
+        &self,
+        req: &types::DeleteLineItemRequest,
+    ) -> Result<(), types::DeleteLineItemError> {
+        println!("Got a request to delete line item: {:?}", req);
+        let email_sha = sha256::digest(req.email.clone());
+        let sqlite_file_path = format!("{}/{}.db", self.db_folder, email_sha);
+        if !std::path::Path::new(&sqlite_file_path).exists() {
+            return Err(types::DeleteLineItemError::UserDoesntExists());
+        }
+        let conn = rusqlite::Connection::open(sqlite_file_path)
+            .map_err(|_| types::DeleteLineItemError::UserDoesntExists())?;
+        let mut delete_stmt = conn
+            .prepare("DELETE FROM line_items WHERE budget_year = ? AND budget_month = ? and id = ?")
+            .map_err(|_| {
+                types::DeleteLineItemError::Internal("Failed to delete line_items".to_string())
+            })?;
+        delete_stmt
+            .execute(rusqlite::params![req.year, req.month, req.item_id])
+            .map_err(|_| {
+                types::DeleteLineItemError::Internal(format!(
+                    "Failed to delete line_item for year {}, month {}, id {}",
+                    req.year, req.month, req.item_id
+                ))
+            })?;
+        Ok(())
+    }
+
     fn get_budget(
         &self,
         req: &types::GetBudgetRequest,
