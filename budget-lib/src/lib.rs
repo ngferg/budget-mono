@@ -26,14 +26,24 @@ pub async fn delete_user(
 }
 
 pub async fn delete_line_item(
-    del_line_item_request: types::DeleteLineItemRequest,
+    req: types::DeleteLineItemRequest,
 ) -> Result<(), types::DeleteLineItemError> {
     use dao::Dao as dao_trait;
 
     let dao = dao::sqlite_dao::SqliteDao::try_new()
         .inspect_err(|e| eprintln!("Failed to create sqlite dao: {}", e.to_string()))
         .unwrap();
-    let _ = dao.delete_line_item(&del_line_item_request)?;
+    let _ = dao.delete_line_item(&req)?;
+    Ok(())
+}
+
+pub async fn add_line_item(req: types::AddLineItemRequest) -> Result<(), types::AddLineItemError> {
+    use dao::Dao as dao_trait;
+
+    let dao = dao::sqlite_dao::SqliteDao::try_new()
+        .inspect_err(|e| eprintln!("Failed to create sqlite dao: {}", e.to_string()))
+        .unwrap();
+    let _ = dao.add_line_item(&req)?;
     Ok(())
 }
 

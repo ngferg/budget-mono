@@ -39,6 +39,14 @@ pub enum DeleteLineItemError {
     Internal(String),
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum AddLineItemError {
+    #[error("User doesn't exists")]
+    UserDoesntExists(),
+    #[error("Internal Error: {0}")]
+    Internal(String),
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct CreateUserRequest {
     pub email: String,
@@ -55,6 +63,16 @@ pub struct DeleteLineItemRequest {
     pub email: String,
     pub year: u32,
     pub month: u32,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct AddLineItemRequest {
+    pub email: String,
+    pub year: u32,
+    pub month: u32,
+    pub category_id: u64,
+    pub description: String,
+    pub amount: u64,
 }
 
 #[derive(Debug, serde::Deserialize)]
