@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { store } from '../store.js'
 const error = ref("");
 const budget = ref(null);
@@ -8,6 +8,11 @@ const year = ref(new Date().getFullYear());
 const month = ref(new Date().getMonth() + 1);
 const item_descriptions = ref([]);
 const item_amounts = ref([]);
+const show_edit_modal = ref(false);
+const edit_item_id = ref(null);
+const edit_item_description = ref("");
+const edit_item_amount = ref("");
+const edit_description_input = ref(null);
 
 const get_budget = async () => {
   console.log("Get budget for: " + store.get_email());
@@ -105,6 +110,53 @@ const new_line_item = async (category_id) => {
     error.value = "Error: " + resp.status;
   }
 };
+
+const open_edit_line_item_modal = (item_id, description, amount) => {
+  edit_item_id.value = item_id;
+  edit_item_description.value = description;
+  edit_item_amount.value = amount / 100;
+  show_edit_modal.value = true;
+  nextTick(() => {
+    edit_description_input.value?.focus();
+  });
+};
+
+const close_edit_modal = () => {
+  show_edit_modal.value = false;
+};
+
+const save_edit_line_item = async () => {
+  if (edit_item_description.value === '' || edit_item_amount.value === '') {
+    console.error("Error: Description and Amount are required.");
+    return;
+  }
+  if (isNaN(edit_item_amount.value) || edit_item_amount.value <= 0) {
+    console.error("Error: Amount must be a positive number.");
+    return;
+  }
+  try {
+    const resp = await fetch('/api/users/budget/line_item', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        'email': store.get_email(),
+        'item_id': edit_item_id.value,
+        'description': edit_item_description.value,
+        'amount': edit_item_amount.value * 100,
+      })
+    });
+    if (resp.status === 200) {
+      close_edit_modal();
+      await get_budget();
+    } else {
+      error.value = "Error: " + resp.status;
+    }
+  } catch (e) {
+    error.value = "Error: " + resp.status;
+  }
+};
 </script>
 
 <template>
@@ -122,7 +174,9 @@ const new_line_item = async (category_id) => {
         {{ category.name }}: {{formatCents(budget[category.id].map(item => item.amount).reduce((a, c) => a + c, 0))}}
         <ul>
           <li v-for="item in budget[category.id]" :key="item.id">
-            {{ item.description }}: {{ formatCents(item.amount) }} <button @click="delete_line_item(item.id)">-</button>
+            {{ item.description }}: {{ formatCents(item.amount) }} <button
+              @click="delete_line_item(item.id)">-</button><button
+              @click="open_edit_line_item_modal(item.id, item.description, item.amount)">✎</button>
           </li>
           <li><input type="text" placeholder="Add new line item" v-model="item_descriptions[category.id]"></input>:
             <input type="number" placeholder="Amount" v-model.number="item_amounts[category.id]"
@@ -135,6 +189,32 @@ const new_line_item = async (category_id) => {
     </div>
   </div>
 
+  <Teleport to="body">
+    <!-- backdrop -->
+    <div v-if="show_edit_modal" class="modal-backdrop" @click="close_edit_modal"></div>
+
+    <!-- modal content -->
+    <div v-if="show_edit_modal" class="modal-container">
+      <div class="modal-header">
+        <h3>Edit Line Item</h3>
+        <button @click="close_edit_modal" class="close-button">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Description:</label>
+          <input type="text" v-model="edit_item_description" ref="edit_description_input" />
+        </div>
+        <div class="form-group">
+          <label>Amount:</label>
+          <input type="number" v-model.number="edit_item_amount" step="0.01" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button @click="save_edit_line_item">Save</button>
+        <button @click="close_edit_modal">Cancel</button>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -167,5 +247,82 @@ input:focus {
 
 input::placeholder {
   color: #999;
+}
+
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 10;
+}
+
+.modal-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #222;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 20;
+  max-width: 500px;
+  width: 90%;
+  color: #fff;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #000;
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+.modal-body {
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: #666;
+}
+
+.form-group input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.close-button:hover {
+  color: #666;
 }
 </style>

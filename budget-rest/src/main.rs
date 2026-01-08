@@ -12,7 +12,9 @@ async fn main() {
         .route("/users/budget", post(find_budget))
         .route(
             "/users/budget/line_item",
-            delete(delete_line_item).post(add_line_item),
+            delete(delete_line_item)
+                .post(add_line_item)
+                .put(edit_line_item),
         );
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -114,6 +116,24 @@ async fn add_line_item(
         Err(e) => match e {
             budget_lib::types::AddLineItemError::UserDoesntExists() => http::StatusCode::NOT_FOUND,
             budget_lib::types::AddLineItemError::Internal(_) => {
+                http::StatusCode::INTERNAL_SERVER_ERROR
+            }
+        },
+    }
+}
+
+async fn edit_line_item(
+    axum::extract::Json(req): axum::extract::Json<budget_lib::types::EditLineItemRequest>,
+) -> http::StatusCode {
+    let res = budget_lib::edit_line_item(req).await;
+    match res {
+        Ok(()) => http::StatusCode::OK,
+        Err(e) => match e {
+            budget_lib::types::EditLineItemError::UserDoesntExists() => http::StatusCode::NOT_FOUND,
+            budget_lib::types::EditLineItemError::LineItemDoesntExist() => {
+                http::StatusCode::NOT_FOUND
+            }
+            budget_lib::types::EditLineItemError::Internal(_) => {
                 http::StatusCode::INTERNAL_SERVER_ERROR
             }
         },

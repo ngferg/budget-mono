@@ -62,6 +62,27 @@ impl Dao for SqliteDao {
         Ok(())
     }
 
+    fn edit_line_item(
+        &self,
+        req: &types::EditLineItemRequest,
+    ) -> Result<(), types::EditLineItemError> {
+        println!("Got a request to edit line item: {:?}", req);
+        let conn = self
+            .get_conn(req.email.clone())
+            .map_err(|_| types::EditLineItemError::UserDoesntExists())?;
+        let mut update_stmt = conn
+            .prepare("UPDATE line_items SET description = ?, amount = ? WHERE id = ?")
+            .map_err(|_| {
+                types::EditLineItemError::Internal("Failed to prepare update statement".to_string())
+            })?;
+        update_stmt
+            .execute(rusqlite::params![req.description, req.amount, req.item_id])
+            .map_err(|e| {
+                types::EditLineItemError::Internal(format!("Failed to update line_item: {e}"))
+            })?;
+        Ok(())
+    }
+
     fn delete_user(&self, req: &types::DeleteUserRequest) -> Result<(), types::DeleteUserError> {
         println!("Got a request to delte user: {}", req.email);
         let email_sha = sha256::digest(req.email.clone());

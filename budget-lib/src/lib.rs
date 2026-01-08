@@ -58,3 +58,15 @@ pub async fn get_budget(
     let res = dao.get_budget(&get_budget_request)?;
     Ok(res)
 }
+
+pub async fn edit_line_item(
+    req: types::EditLineItemRequest,
+) -> Result<(), types::EditLineItemError> {
+    use dao::Dao as dao_trait;
+
+    let dao = dao::sqlite_dao::SqliteDao::try_new()
+        .inspect_err(|e| eprintln!("Failed to create sqlite dao: {}", e.to_string()))
+        .unwrap();
+    let _ = dao.edit_line_item(&req)?;
+    Ok(())
+}

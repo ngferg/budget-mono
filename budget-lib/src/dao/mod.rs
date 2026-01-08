@@ -7,6 +7,10 @@ pub trait Dao {
     fn delete_user(&self, req: &types::DeleteUserRequest) -> Result<(), types::DeleteUserError>;
     fn add_line_item(&self, req: &types::AddLineItemRequest)
     -> Result<(), types::AddLineItemError>;
+    fn edit_line_item(
+        &self,
+        req: &types::EditLineItemRequest,
+    ) -> Result<(), types::EditLineItemError>;
     fn delete_line_item(
         &self,
         req: &types::DeleteLineItemRequest,
