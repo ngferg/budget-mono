@@ -151,4 +151,21 @@ h6,
 li {
   text-align: left;
 }
+
+input {
+  border: none;
+  border-bottom: 2px solid #333;
+  background-color: transparent;
+  padding: 4px 0;
+  font-size: 1em;
+}
+
+input:focus {
+  outline: none;
+  border-bottom-color: #0066cc;
+}
+
+input::placeholder {
+  color: #999;
+}
 </style>
