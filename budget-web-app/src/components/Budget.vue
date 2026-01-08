@@ -125,8 +125,9 @@ const new_line_item = async (category_id) => {
             {{ item.description }}: {{ formatCents(item.amount) }} <button @click="delete_line_item(item.id)">-</button>
           </li>
           <li><input type="text" placeholder="Add new line item" v-model="item_descriptions[category.id]"></input>:
-            <input type="number" placeholder="Amount" v-model.number="item_amounts[category.id]"></input><button
-              @click="new_line_item(category.id)">+</button>
+            <input type="number" placeholder="Amount" v-model.number="item_amounts[category.id]"
+              @keydown.enter="new_line_item(category.id)"></input><button
+              @click=" new_line_item(category.id)">+</button>
           </li>
 
         </ul>
