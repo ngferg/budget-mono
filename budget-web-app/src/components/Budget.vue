@@ -157,6 +157,26 @@ const save_edit_line_item = async () => {
     error.value = "Error: " + resp.status;
   }
 };
+
+async function last_month() {
+  if (month.value === 1) {
+    month.value = 12;
+    year.value -= 1;
+  } else {
+    month.value -= 1;
+  }
+  await get_budget();
+}
+
+async function next_month() {
+  if (month.value === 12) {
+    month.value = 1;
+    year.value += 1;
+  } else {
+    month.value += 1;
+  }
+  await get_budget();
+}
 </script>
 
 <template>
@@ -167,7 +187,8 @@ const save_edit_line_item = async () => {
   </div>
 
   <div v-if="budget !== null" class="card">
-    <h2>Budget for {{ month }}/{{ year }}</h2>
+    <h2><button @click="last_month">&lt;</button>Budget for {{ month }}/{{ year }}<button
+        @click="next_month">&gt;</button></h2>
     <h3>Categories:</h3>
     <div>
       <h4 v-for="category in categories" :key="category.id">
