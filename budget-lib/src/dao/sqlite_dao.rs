@@ -182,7 +182,23 @@ impl Dao for SqliteDao {
                 lis.push(li);
             }
         });
-        let last_month_clonable = budget.iter().all(|cat| cat.1.len() == 0);
+
+        let last_month = if req.month == 1 { 12 } else { req.month - 1 };
+        let last_year = if req.month == 1 {
+            req.year - 1
+        } else {
+            req.year
+        };
+        // Check if there is at least one line item in last month's table
+        let mut last_month_stmt = conn
+            .prepare("SELECT COUNT(1) FROM line_items WHERE budget_year = ? AND budget_month = ?")
+            .map_err(|_| {
+                types::GetBudgetError::Internal("Failed to query last month line_items".to_string())
+            })?;
+        let last_month_count: u64 = last_month_stmt
+            .query_row(rusqlite::params![last_year, last_month], |row| row.get(0))
+            .unwrap_or(0);
+        let last_month_clonable = last_month_count > 0 && budget.iter().all(|cat| cat.1.len() == 0);
 
         Ok(types::GetBudgetResponse {
             categories,
