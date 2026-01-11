@@ -19,4 +19,5 @@ pub trait Dao {
         &self,
         req: &types::GetBudgetRequest,
     ) -> Result<types::GetBudgetResponse, types::GetBudgetError>;
+    fn clone_month(&self, req: &types::CloneMonthRequest) -> Result<(), types::CloneMonthError>;
 }

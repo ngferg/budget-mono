@@ -13,6 +13,7 @@ const edit_item_id = ref(null);
 const edit_item_description = ref("");
 const edit_item_amount = ref("");
 const edit_description_input = ref(null);
+const last_month_clonable = ref(false);
 
 const get_budget = async () => {
   console.log("Get budget for: " + store.get_email());
@@ -34,6 +35,7 @@ const get_budget = async () => {
       categories.value = j.categories;
       item_amounts.value = new Array(categories.value.length).fill('');
       item_descriptions.value = new Array(categories.value.length).fill('');
+      last_month_clonable.value = j.last_month_clonable;
     } else {
       error.value = "Error: " + resp.status;
     }
@@ -158,6 +160,37 @@ const save_edit_line_item = async () => {
   }
 };
 
+const clone_last_month = async () => {
+  let source_year = year.value;
+  let source_month = month.value - 1;
+  if (source_month === 0) {
+    source_month = 12;
+    source_year -= 1;
+  }
+  try {
+    const resp = await fetch('/api/users/budget/clone_month', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        'email': store.get_email(),
+        'source_year': source_year,
+        'source_month': source_month,
+        'target_year': year.value,
+        'target_month': month.value,
+      })
+    });
+    if (resp.status === 201) {
+      await get_budget();
+    } else {
+      error.value = "Error: " + resp.status;
+    }
+  } catch (e) {
+    error.value = "Error: " + resp.status;
+  }
+}
+
 async function last_month() {
   if (month.value === 1) {
     month.value = 12;
@@ -189,6 +222,9 @@ async function next_month() {
   <div v-if="budget !== null" class="card">
     <h2><button @click="last_month">&lt;</button>Budget for {{ month }}/{{ year }}<button
         @click="next_month">&gt;</button></h2>
+    <div v-if="last_month_clonable">
+      <button @click="clone_last_month">Clone Last Month's Budget</button>
+    </div>
     <h3>Categories:</h3>
     <div>
       <h4 v-for="category in categories" :key="category.id">

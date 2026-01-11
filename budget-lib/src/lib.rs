@@ -70,3 +70,13 @@ pub async fn edit_line_item(
     let _ = dao.edit_line_item(&req)?;
     Ok(())
 }
+
+pub async fn clone_last_month(req: types::CloneMonthRequest) -> Result<(), types::CloneMonthError> {
+    use dao::Dao as dao_trait;
+
+    let dao = dao::sqlite_dao::SqliteDao::try_new()
+        .inspect_err(|e| eprintln!("Failed to create sqlite dao: {}", e.to_string()))
+        .unwrap();
+    let _ = dao.clone_month(&req)?;
+    Ok(())
+}

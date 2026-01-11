@@ -15,7 +15,8 @@ async fn main() {
             delete(delete_line_item)
                 .post(add_line_item)
                 .put(edit_line_item),
-        );
+        )
+        .route("/users/budget/clone_month", post(clone_month));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
@@ -134,6 +135,24 @@ async fn edit_line_item(
                 http::StatusCode::NOT_FOUND
             }
             budget_lib::types::EditLineItemError::Internal(_) => {
+                http::StatusCode::INTERNAL_SERVER_ERROR
+            }
+        },
+    }
+}
+
+async fn clone_month(
+    axum::extract::Json(req): axum::extract::Json<budget_lib::types::CloneMonthRequest>,
+) -> http::StatusCode {
+    let res = budget_lib::clone_last_month(req).await;
+    match res {
+        Ok(()) => http::StatusCode::CREATED,
+        Err(e) => match e {
+            budget_lib::types::CloneMonthError::UserDoesntExists() => http::StatusCode::NOT_FOUND,
+            budget_lib::types::CloneMonthError::SourceMonthDoesntExist() => {
+                http::StatusCode::NOT_FOUND
+            }
+            budget_lib::types::CloneMonthError::Internal(_) => {
                 http::StatusCode::INTERNAL_SERVER_ERROR
             }
         },

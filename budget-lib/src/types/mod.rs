@@ -57,6 +57,16 @@ pub enum EditLineItemError {
     Internal(String),
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum CloneMonthError {
+    #[error("User doesn't exists")]
+    UserDoesntExists(),
+    #[error("Source month doesn't exist")]
+    SourceMonthDoesntExist(),
+    #[error("Internal Error: {0}")]
+    Internal(String),
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct CreateUserRequest {
     pub email: String,
@@ -100,10 +110,20 @@ pub struct GetBudgetRequest {
     pub month: u32,
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct CloneMonthRequest {
+    pub email: String,
+    pub source_year: u32,
+    pub source_month: u32,
+    pub target_year: u32,
+    pub target_month: u32,
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct GetBudgetResponse {
     pub categories: Vec<Category>,
     pub budget: collections::HashMap<u64, Vec<LineItem>>,
+    pub last_month_clonable: bool,
 }
 
 #[derive(Debug, serde::Serialize)]

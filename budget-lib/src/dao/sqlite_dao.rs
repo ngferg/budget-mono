@@ -182,8 +182,65 @@ impl Dao for SqliteDao {
                 lis.push(li);
             }
         });
+        let last_month_clonable = budget.iter().all(|cat| cat.1.len() == 0);
 
-        Ok(types::GetBudgetResponse { categories, budget })
+        Ok(types::GetBudgetResponse {
+            categories,
+            budget,
+            last_month_clonable,
+        })
+    }
+
+    fn clone_month(&self, req: &types::CloneMonthRequest) -> Result<(), types::CloneMonthError> {
+        println!("Got a request to clone month: {:?}", req);
+        let conn = self
+            .get_conn(req.email.clone())
+            .map_err(|_| types::CloneMonthError::UserDoesntExists())?;
+
+        let mut select_stmt = conn
+            .prepare("SELECT description, amount, category FROM line_items WHERE budget_year = ? AND budget_month = ?")
+            .map_err(|_| {
+                types::CloneMonthError::Internal("Failed to prepare select statement".to_string())
+            })?;
+        let line_item_iter = select_stmt
+            .query_map(
+                rusqlite::params![req.source_year, req.source_month],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, u64>(1)?,
+                        row.get::<_, u64>(2)?,
+                    ))
+                },
+            )
+            .map_err(|e| {
+                types::CloneMonthError::Internal(format!("Failed to query line_items: {e}"))
+            })?;
+
+        let mut insert_stmt = conn
+            .prepare("INSERT INTO line_items (description, amount, category, budget_year, budget_month) VALUES (?, ?, ?, ?, ?)")
+            .map_err(|_| {
+                types::CloneMonthError::Internal("Failed to prepare insert statement".to_string())
+            })?;
+
+        for line_item_res in line_item_iter {
+            let (description, amount, category) = line_item_res.map_err(|e| {
+                types::CloneMonthError::Internal(format!("Failed to read line_item: {e}"))
+            })?;
+            insert_stmt
+                .execute(rusqlite::params![
+                    description,
+                    amount,
+                    category,
+                    req.target_year,
+                    req.target_month
+                ])
+                .map_err(|e| {
+                    types::CloneMonthError::Internal(format!("Failed to insert line_item: {e}"))
+                })?;
+        }
+
+        Ok(())
     }
 }
 
