@@ -20,3 +20,9 @@ run-rest:
 run-dev-webapp:
 	npm run dev --prefix ./budget-web-app/
 
+
+.PHONY: run-auth
+run-auth:
+	cd auth-svc
+	cargo run
+	cd -

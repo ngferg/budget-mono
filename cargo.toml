@@ -1,10 +1,11 @@
 [workspace]
 resolver = "3"
-members = ["budget-lib", "budget-rest"]
+members = ["auth-svc","budget-lib", "budget-rest"]
 
 [workspace.dependencies]
 axum = "0.8.6"
 chrono = "0.4.42"
+rand = "0.8.5"
 rusqlite = "0.37.0"
 serde = { version = "1.0.228", features = ["serde_derive", "derive"] }
 serde_json = "1.0.145"
