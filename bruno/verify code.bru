@@ -1,0 +1,28 @@
+meta {
+  name: verify code
+  type: http
+  seq: 9
+}
+
+post {
+  url: http://localhost:3001/verify_code
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email": "cool-guy@example.com",
+    "code": "762749"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.categories: isArray
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

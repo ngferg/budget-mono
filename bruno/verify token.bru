@@ -1,18 +1,19 @@
 meta {
-  name: get token
+  name: verify token
   type: http
-  seq: 8
+  seq: 10
 }
 
 post {
-  url: http://localhost:3001/request_token
+  url: http://localhost:3001/verify_token
   body: json
   auth: inherit
 }
 
 body:json {
   {
-    "email": "cool-guy@example.com"
+    "email": "cool-guy@example.com",
+    "token": "WQFupJ0v4Y2hTy4p5PiSK7dBLqS2oGiXs4G3N6r8EnFLJ2Bvzq9V7SYfHqOafhdy"
   }
 }
 

@@ -23,6 +23,4 @@ run-dev-webapp:
 
 .PHONY: run-auth
 run-auth:
-	cd auth-svc
-	cargo run
-	cd -
+	cargo run --bin auth-svc
