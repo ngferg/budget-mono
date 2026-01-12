@@ -22,6 +22,7 @@ const get_budget = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': store.get_token(),
       },
       body: JSON.stringify({
         'email': store.get_email(),
@@ -59,6 +60,7 @@ const delete_line_item = async (item_id) => {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': store.get_token(),
       },
       body: JSON.stringify({
         'email': store.get_email(),
@@ -91,6 +93,7 @@ const new_line_item = async (category_id) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': store.get_token(),
       },
       body: JSON.stringify({
         'email': store.get_email(),
@@ -141,6 +144,7 @@ const save_edit_line_item = async () => {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': store.get_token(),
       },
       body: JSON.stringify({
         'email': store.get_email(),
@@ -172,6 +176,7 @@ const clone_last_month = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': store.get_token(),
       },
       body: JSON.stringify({
         'email': store.get_email(),
@@ -259,11 +264,12 @@ async function next_month() {
       <div class="modal-body">
         <div class="form-group">
           <label>Description:</label>
-          <input type="text" v-model="edit_item_description" ref="edit_description_input" />
+          <input type="text" v-model="edit_item_description" ref="edit_description_input"
+            @keydown.enter="save_edit_line_item" />
         </div>
         <div class="form-group">
           <label>Amount:</label>
-          <input type="number" v-model.number="edit_item_amount" step="0.01" />
+          <input type="number" v-model.number="edit_item_amount" step="0.01" @keydown.enter="save_edit_line_item" />
         </div>
       </div>
       <div class="modal-footer">

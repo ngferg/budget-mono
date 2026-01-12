@@ -47,6 +47,7 @@ const verify_code = async () => {
         'code': code.value,
       })
     });
+    console.log(resp);
     if (resp.status === 200) {
       const data = await resp.json();
       token.value = data.token;
@@ -66,6 +67,7 @@ const login = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': token.value,
       },
       body: JSON.stringify({
         'email': email.value,
@@ -74,7 +76,7 @@ const login = async () => {
     if (resp.status === 201 || resp.status === 409) {
       store.log_in_as(email.value, token.value);
     } else {
-      error.value = "Incorrect code";
+      error.value = "Login failed";
     }
   } catch (e) {
     error.value = "Error: " + resp.status;

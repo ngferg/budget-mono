@@ -80,3 +80,19 @@ pub async fn clone_last_month(req: types::CloneMonthRequest) -> Result<(), types
     let _ = dao.clone_month(&req)?;
     Ok(())
 }
+
+pub async fn check_token(email: &str, token: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    client
+        .post("http://localhost:3001/verify_token")
+        .json(&types::VerifyTokenRequest {
+            email: email.to_string(),
+            token: token.to_string(),
+        })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to send request to auth service: {}", e))?
+        .error_for_status()
+        .map_err(|e| format!("Token verification failed: {}", e))?;
+    Ok(())
+}

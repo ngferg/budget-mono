@@ -6,15 +6,11 @@ clean-dbs:
 .PHONY: run-rest-fresh
 run-rest-fresh:
 	make clean-dbs
-	cd budget-rest
-	SQLITE_DB_PATH="budget-lib/dbs" cargo run
-	cd -
+	SQLITE_DB_PATH="budget-lib/dbs" cargo run --bin budget-rest
 
 .PHONY: run-rest
 run-rest:
-	cd budget-rest
-	SQLITE_DB_PATH="budget-lib/dbs" cargo run
-	cd -
+	SQLITE_DB_PATH="budget-lib/dbs" cargo run --bin budget-rest
 
 .PHONY: run-dev-webapp
 run-dev-webapp:

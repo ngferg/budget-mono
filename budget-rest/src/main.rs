@@ -35,8 +35,15 @@ async fn health() -> (http::StatusCode, axum::Json<serde_json::Value>) {
 }
 
 async fn find_budget(
+    headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::GetBudgetRequest>,
 ) -> (http::StatusCode, axum::Json<serde_json::Value>) {
+    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+        return (
+            e,
+            axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+        );
+    }
     let res = budget_lib::get_budget(req).await;
     match res {
         Ok(res) => (
@@ -61,8 +68,12 @@ async fn find_budget(
 }
 
 async fn create_user(
+    headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::CreateUserRequest>,
 ) -> http::StatusCode {
+    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+        return e;
+    }
     let res = budget_lib::create_user(req).await;
     match res {
         Ok(()) => http::StatusCode::CREATED,
@@ -79,8 +90,12 @@ async fn create_user(
 }
 
 async fn delete_user(
+    headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::DeleteUserRequest>,
 ) -> http::StatusCode {
+    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+        return e;
+    }
     let res = budget_lib::delete_user(req).await;
     match res {
         Ok(()) => http::StatusCode::NO_CONTENT,
@@ -89,8 +104,12 @@ async fn delete_user(
 }
 
 async fn delete_line_item(
+    headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::DeleteLineItemRequest>,
 ) -> http::StatusCode {
+    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+        return e;
+    }
     let res = budget_lib::delete_line_item(req).await;
     match res {
         Ok(()) => http::StatusCode::NO_CONTENT,
@@ -109,8 +128,12 @@ async fn delete_line_item(
 }
 
 async fn add_line_item(
+    headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::AddLineItemRequest>,
 ) -> http::StatusCode {
+    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+        return e;
+    }
     let res = budget_lib::add_line_item(req).await;
     match res {
         Ok(()) => http::StatusCode::CREATED,
@@ -124,8 +147,12 @@ async fn add_line_item(
 }
 
 async fn edit_line_item(
+    headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::EditLineItemRequest>,
 ) -> http::StatusCode {
+    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+        return e;
+    }
     let res = budget_lib::edit_line_item(req).await;
     match res {
         Ok(()) => http::StatusCode::OK,
@@ -142,8 +169,12 @@ async fn edit_line_item(
 }
 
 async fn clone_month(
+    headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::CloneMonthRequest>,
 ) -> http::StatusCode {
+    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+        return e;
+    }
     let res = budget_lib::clone_last_month(req).await;
     match res {
         Ok(()) => http::StatusCode::CREATED,
@@ -156,5 +187,25 @@ async fn clone_month(
                 http::StatusCode::INTERNAL_SERVER_ERROR
             }
         },
+    }
+}
+
+async fn verify_auth(headers: axum::http::HeaderMap, email: &str) -> Result<(), http::StatusCode> {
+    let auth = headers.get("Authorization");
+    match auth {
+        None => {
+            return Err(http::StatusCode::UNAUTHORIZED);
+        }
+        Some(token) => {
+            let token_str = token.to_str().unwrap_or("");
+            let res = budget_lib::check_token(email, token_str).await;
+            match res {
+                Err(e) => {
+                    println!("Auth error: {e}");
+                    return Err(http::StatusCode::UNAUTHORIZED);
+                }
+                Ok(()) => Ok(()),
+            }
+        }
     }
 }

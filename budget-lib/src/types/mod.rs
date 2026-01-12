@@ -127,6 +127,12 @@ pub struct GetBudgetResponse {
 }
 
 #[derive(Debug, serde::Serialize)]
+pub(crate) struct VerifyTokenRequest {
+    pub email: String,
+    pub token: String,
+}
+
+#[derive(Debug, serde::Serialize)]
 pub enum CategoryType {
     Income,
     Expense,
