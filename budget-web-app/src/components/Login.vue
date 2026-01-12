@@ -52,7 +52,7 @@ const verify_code = async () => {
       token.value = data.token;
       await login();
     } else {
-      error.value = "Error: " + resp.status;
+      error.value = "Incorrect code";
     }
   } catch (e) {
     error.value = "Error: " + resp.status;
@@ -74,7 +74,7 @@ const login = async () => {
     if (resp.status === 201 || resp.status === 409) {
       store.log_in_as(email.value, token.value);
     } else {
-      error.value = "Error: " + resp.status;
+      error.value = "Incorrect code";
     }
   } catch (e) {
     error.value = "Error: " + resp.status;
