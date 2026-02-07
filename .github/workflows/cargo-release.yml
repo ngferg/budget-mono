@@ -1,0 +1,58 @@
+name: Cargo Release Build
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build Release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        bin: [auth-svc, budget-rest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build ${{ matrix.bin }}
+        run: cargo build --release --bin ${{ matrix.bin }}
+        env:
+          SQLITE_DB_PATH: budget-lib/dbs
+
+      - name: Upload ${{ matrix.bin }} artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.bin }}-${{ github.ref_name }}
+          path: target/release/${{ matrix.bin }}
+          retention-days: 30
+
+  create-release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/**/*
+          draft: false
+          prerelease: false
