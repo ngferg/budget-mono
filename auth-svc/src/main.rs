@@ -4,6 +4,10 @@ use rand::Rng;
 use rand::distributions::{Alphanumeric, DistString};
 mod types;
 
+static FROM_ADDR: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+static SMTP_PASSWORD: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+static SMTP_HOST: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
 #[derive(Clone)]
 struct AppState {
     code_map: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<String, String>>>,
@@ -12,6 +16,17 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
+    FROM_ADDR
+        .set(std::env::var("SMTP_USER").expect("SMTP_USER env var must be set"))
+        .unwrap();
+    SMTP_PASSWORD
+        .set(std::env::var("SMTP_PASS").expect("SMTP_PASS env var must be set"))
+        .unwrap();
+    SMTP_HOST
+        .set(std::env::var("SMTP_HOST").expect("SMTP_HOST env var must be set"))
+        .unwrap();
     let state = AppState {
         code_map: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         token_map: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
@@ -25,6 +40,7 @@ async fn main() {
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
+    println!("Auth service starting on port 3001");
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -56,17 +72,44 @@ async fn request_code(
         code_map.insert(email_sha.clone(), code.clone());
     }
     println!("Generated code {code} for email {email_sha}");
-    // TODO: Send email with token
-    axum::http::StatusCode::OK
+    // Build a simple multipart message
+    let to_addr = req.email.clone();
+    let from_email = FROM_ADDR.get().map(|s| s.as_str()).unwrap_or("");
+    let smtp_pass = SMTP_PASSWORD.get().map(|s| s.as_str()).unwrap_or("");
+
+    let message = mail_send::mail_builder::MessageBuilder::new()
+        .from(("FeBudget", from_email))
+        .to(to_addr.as_str())
+        .subject("Here's your login code")
+        .text_body(format!("Your login code is: {code}"))
+        .html_body(format!("<p>Your login code is: {code}</p>"));
+
+    // Connect to the SMTP submissions port, upgrade to TLS and
+    // authenticate using the provided credentials.
+    let res =
+        mail_send::SmtpClientBuilder::new(SMTP_HOST.get().map(|s| s.as_str()).unwrap_or(""), 587)
+            .implicit_tls(false)
+            .credentials((from_email, smtp_pass))
+            .connect()
+            .await
+            .expect("Failed to connect to SMTP server")
+            .send(message)
+            .await
+            .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+    match res {
+        Ok(_) => axum::http::StatusCode::OK,
+        Err(e) => e,
+    }
 }
 
 async fn verify_code(
     State(state): State<AppState>,
     Json(req): Json<types::VerifyCodeRequest>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
-    println!("Login request: {:?}", req);
+    println!("Login request: {req:?}");
     let code_map = state.code_map.read().await;
-    let code = code_map.get(&sha256::digest(req.email.clone()));
+    let hashed_email = sha256::digest(req.email.clone());
+    let code = code_map.get(&hashed_email);
     match code {
         Some(stored_code) => {
             if *stored_code == req.code {
@@ -74,7 +117,7 @@ async fn verify_code(
                 let res = types::VerifyCodeResponse { token };
                 {
                     let mut token_map = state.token_map.write().await;
-                    token_map.insert(sha256::digest(req.email.clone()), res.token.clone());
+                    token_map.insert(hashed_email, res.token.clone());
                 }
                 return (
                     axum::http::StatusCode::OK,

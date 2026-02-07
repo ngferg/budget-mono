@@ -5,8 +5,10 @@ members = ["auth-svc","budget-lib", "budget-rest"]
 [workspace.dependencies]
 axum = "0.8.6"
 chrono = "0.4.42"
+mail-send = { version = "0.5.2", features = ["ring"] }
 reqwest = { version = "0.13.1", features = ["json"] }
 rand = "0.8.5"
+rustls = { version = "0.23", features = ["ring"] }
 rusqlite = "0.37.0"
 serde = { version = "1.0.228", features = ["serde_derive", "derive"] }
 serde_json = "1.0.145"

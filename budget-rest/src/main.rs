@@ -19,6 +19,7 @@ async fn main() {
         .route("/users/budget/clone_month", post(clone_month));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    println!("Budget service started on port 3000");
     axum::serve(listener, app).await.unwrap();
 }
 
