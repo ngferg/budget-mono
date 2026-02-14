@@ -1,0 +1,33 @@
+meta {
+  name: find budget vps
+  type: http
+  seq: 15
+}
+
+post {
+  url: http://35.206.84.98:3000/users/budget
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: AvRjWm0Hq8V3coMEJ23Zf7crcL01KjclcC7F7R6hpDVqtfpKPMlHJ4VsUSH0alCF
+}
+
+body:json {
+  {
+    "email": "me@nicholaus-ferguson.us",
+    "year": 2026,
+    "month": 2
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.categories: isArray
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

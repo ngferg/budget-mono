@@ -2,6 +2,8 @@
 import { ref, nextTick } from 'vue'
 import { store } from '../store.js'
 
+const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 const email = ref("");
 const error = ref("");
 const code = ref("");
@@ -12,7 +14,7 @@ const code_input = ref(null);
 const request_code = async () => {
   console.log("Request code for: " + email.value);
   try {
-    const resp = await fetch('/auth/request_code', {
+    const resp = await fetch(AUTH_BASE_URL + '/request_code', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -30,14 +32,14 @@ const request_code = async () => {
       error.value = "Error: " + resp.status;
     }
   } catch (e) {
-    error.value = "Error: " + resp.status;
+    error.value = "Error: " + e.message;
   }
 };
 
 const verify_code = async () => {
   console.log("Verify code for: " + email.value);
   try {
-    const resp = await fetch('/auth/verify_code', {
+    const resp = await fetch(AUTH_BASE_URL + '/verify_code', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -56,14 +58,14 @@ const verify_code = async () => {
       error.value = "Incorrect code";
     }
   } catch (e) {
-    error.value = "Error: " + resp.status;
+    error.value = "Error: " + e.message;
   }
 };
 
 const login = async () => {
   console.log("Log in as: " + email.value);
   try {
-    const resp = await fetch('/api/users', {
+    const resp = await fetch(API_BASE_URL + '/users', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -79,7 +81,7 @@ const login = async () => {
       error.value = "Login failed";
     }
   } catch (e) {
-    error.value = "Error: " + resp.status;
+    error.value = "Error: " + e.message;
   }
 };
 </script>

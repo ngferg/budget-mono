@@ -1,0 +1,28 @@
+meta {
+  name: verify token vpc
+  type: http
+  seq: 12
+}
+
+post {
+  url: http://35.206.84.98:3001/verify_token
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email": "me@nicholaus-ferguson.us",
+    "token": "QE5bjcQO1Gfj5Jeswh3GuC69CrFNjHL5PyNBohKiXs3K8gAw5jdrYODbhDg4mYJB"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.categories: isArray
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

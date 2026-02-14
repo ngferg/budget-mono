@@ -1,6 +1,9 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { store } from '../store.js'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
 const error = ref("");
 const budget = ref(null);
 const categories = ref(null);
@@ -18,7 +21,7 @@ const last_month_clonable = ref(false);
 const get_budget = async () => {
   console.log("Get budget for: " + store.get_email());
   try {
-    const resp = await fetch('/api/users/budget', {
+    const resp = await fetch(API_BASE_URL + '/users/budget', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -41,7 +44,7 @@ const get_budget = async () => {
       error.value = "Error: " + resp.status;
     }
   } catch (e) {
-    error.value = "Error: " + resp.status;
+    error.value = "Error: " + e.message;
   }
 };
 
@@ -56,7 +59,7 @@ const formatCents = (cents) => {
 
 const delete_line_item = async (item_id) => {
   try {
-    const resp = await fetch('/api/users/budget/line_item', {
+    const resp = await fetch(API_BASE_URL + '/users/budget/line_item', {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -75,7 +78,7 @@ const delete_line_item = async (item_id) => {
       error.value = "Error: " + resp.status;
     }
   } catch (e) {
-    error.value = "Error: " + resp.status;
+    error.value = "Error: " + e.message;
   }
 }
 
@@ -89,7 +92,7 @@ const new_line_item = async (category_id) => {
     return;
   }
   try {
-    const resp = await fetch('/api/users/budget/line_item', {
+    const resp = await fetch(API_BASE_URL + '/users/budget/line_item', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -112,7 +115,7 @@ const new_line_item = async (category_id) => {
       error.value = "Error: " + resp.status;
     }
   } catch (e) {
-    error.value = "Error: " + resp.status;
+    error.value = "Error: " + e.message;
   }
 };
 
@@ -140,7 +143,7 @@ const save_edit_line_item = async () => {
     return;
   }
   try {
-    const resp = await fetch('/api/users/budget/line_item', {
+    const resp = await fetch(API_BASE_URL + '/users/budget/line_item', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -160,7 +163,7 @@ const save_edit_line_item = async () => {
       error.value = "Error: " + resp.status;
     }
   } catch (e) {
-    error.value = "Error: " + resp.status;
+    error.value = "Error: " + e.message;
   }
 };
 
@@ -172,7 +175,7 @@ const clone_last_month = async () => {
     source_year -= 1;
   }
   try {
-    const resp = await fetch('/api/users/budget/clone_month', {
+    const resp = await fetch(API_BASE_URL + '/users/budget/clone_month', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -192,7 +195,7 @@ const clone_last_month = async () => {
       error.value = "Error: " + resp.status;
     }
   } catch (e) {
-    error.value = "Error: " + resp.status;
+    error.value = "Error: " + e.message;
   }
 }
 
