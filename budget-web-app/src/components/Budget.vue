@@ -294,9 +294,43 @@ h1,
 h3,
 h4,
 h5,
-h6,
+h6 {
+  text-align: left;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.8em 0;
+}
+
 li {
   text-align: left;
+  padding: 0.75em 1em;
+  margin: 0.5em 0;
+  background: rgba(16, 185, 129, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid #10b981;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+li:hover {
+  background: rgba(16, 185, 129, 0.12);
+  border-left-color: #34d399;
+  transform: translateX(2px);
+}
+
+li:last-child {
+  background: rgba(16, 185, 129, 0.03);
+  border-left-color: #6b7280;
+  border-style: dashed;
+}
+
+li:last-child:hover {
+  background: rgba(16, 185, 129, 0.08);
+  border-left-color: #10b981;
 }
 
 h2 {
@@ -314,9 +348,6 @@ h2 button {
   min-width: 40px;
 }
 
-button {
-  margin-left: 0.5em;
-}
 
 input {
   border: none;

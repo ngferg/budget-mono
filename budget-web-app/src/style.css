@@ -37,26 +37,6 @@ body {
   min-height: 100vh;
 }
 
-button {
-  border-radius: 8px;
-  border: 2px solid var(--primary-green);
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 600;
-  font-family: inherit;
-  background-color: var(--primary-green);
-  color: white;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
-
-button:hover {
-  background-color: #059669;
-  border-color: #059669;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-}
-
 button:focus,
 button:focus-visible {
   outline: 2px solid var(--primary-green);
@@ -96,4 +76,21 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+button {
+  padding: 0.4em 0.7em;
+  margin-left: 0.3em;
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid #10b981;
+  color: #d1fae5;
+  border-radius: 6px;
+  font-size: 0.9em;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  background: rgba(16, 185, 129, 0.3);
+  border-color: #34d399;
+  transform: scale(1.05);
 }
