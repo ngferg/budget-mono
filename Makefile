@@ -25,7 +25,7 @@ run-auth:
 run-prod-webapp:
 	npm run build
 	sudo cp -r ./budget-web-app/dist/ /var/www/
-    sudo systemctl restart nginx
+	sudo systemctl restart nginx
 
 .PHONY: build-prod-binaries
 build-prod-binaries:
