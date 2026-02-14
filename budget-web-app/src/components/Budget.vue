@@ -42,6 +42,9 @@ const get_budget = async () => {
       last_month_clonable.value = j.last_month_clonable;
     } else {
       error.value = "Error: " + resp.status;
+      if (resp.status === 401) {
+        store.log_out();
+      }
     }
   } catch (e) {
     error.value = "Error: " + e.message;
