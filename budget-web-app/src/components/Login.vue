@@ -4,10 +4,10 @@ import { store } from '../store.js'
 
 const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:3001';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-const email = ref("");
+const email = ref(store.get_email());
 const error = ref("");
 const code = ref("");
-const token = ref("");
+const token = ref(store.get_token());
 const code_requested = ref(false);
 const code_input = ref(null);
 
@@ -30,9 +30,11 @@ const request_code = async () => {
       });
     } else {
       error.value = "Error: " + resp.status;
+      store.log_out();
     }
   } catch (e) {
     error.value = "Error: " + e.message;
+    store.log_out();
   }
 };
 
@@ -56,9 +58,11 @@ const verify_code = async () => {
       await login();
     } else {
       error.value = "Incorrect code";
+      store.log_out();
     }
   } catch (e) {
     error.value = "Error: " + e.message;
+    store.log_out();
   }
 };
 
@@ -79,9 +83,11 @@ const login = async () => {
       store.log_in_as(email.value, token.value);
     } else {
       error.value = "Login failed";
+      store.log_out();
     }
   } catch (e) {
     error.value = "Error: " + e.message;
+    store.log_out();
   }
 };
 </script>
