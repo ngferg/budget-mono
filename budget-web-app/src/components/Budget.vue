@@ -224,8 +224,6 @@ async function next_month() {
 </script>
 
 <template>
-  <h1>Budget Page</h1>
-
   <div class="card" v-if="error">
     <p class="error-text">{{ error }}</p>
   </div>
