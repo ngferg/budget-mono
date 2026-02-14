@@ -2,9 +2,12 @@ use axum::{
     Router, http,
     routing::{delete, get, post},
 };
+use tower_http::cors::CorsLayer;
 
 #[tokio::main]
 async fn main() {
+    // CORS configuration
+    let cors = CorsLayer::permissive();
     // our router
     let app = Router::new()
         .route("/health", get(health))
@@ -16,7 +19,8 @@ async fn main() {
                 .post(add_line_item)
                 .put(edit_line_item),
         )
-        .route("/users/budget/clone_month", post(clone_month));
+        .route("/users/budget/clone_month", post(clone_month))
+        .layer(cors);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("Budget service started on port 3000");

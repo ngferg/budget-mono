@@ -2,6 +2,7 @@ use axum::extract::{Json, State};
 use axum::routing;
 use rand::Rng;
 use rand::distributions::{Alphanumeric, DistString};
+use tower_http::cors::CorsLayer;
 mod types;
 
 static FROM_ADDR: std::sync::OnceLock<String> = std::sync::OnceLock::new();
@@ -31,12 +32,15 @@ async fn main() {
         code_map: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         token_map: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
     };
+    // CORS configuration
+    let cors = CorsLayer::permissive();
     // our router
     let app = axum::Router::new()
         .route("/health", routing::get(health))
         .route("/request_code", routing::post(request_code))
         .route("/verify_code", routing::post(verify_code))
         .route("/verify_token", routing::post(verify_token))
+        .layer(cors)
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
