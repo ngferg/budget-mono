@@ -11,15 +11,16 @@ const handleLogout = () => {
 </script>
 
 <template>
-  <nav class="navbar">
-    <div class="navbar-content">
-      <h1>febudget.com</h1>
-      <button v-if="store.is_logged_in" @click="handleLogout" class="logout-btn">
+  <nav class="fixed top-0 left-0 right-0 z-50 w-full bg-gray-800 px-8 py-4 shadow-md navbar">
+    <div class="flex justify-between items-center">
+      <h1 class="text-white m-0 text-m">febudget.com</h1>
+      <button v-if="store.is_logged_in" @click="handleLogout"
+        class="bg-red-500 text-white px-4 py-2 rounded cursor-pointer text-base transition-colors hover:bg-red-600">
         Log Out
       </button>
     </div>
   </nav>
-  <div class="main-content">
+  <div class="mt-24">
     <Login v-if="!store.is_logged_in" />
     <Budget v-if="store.is_logged_in" />
   </div>
@@ -27,46 +28,12 @@ const handleLogout = () => {
 
 <style scoped>
 .navbar {
-  background-color: #333;
-  padding: 1rem 2rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-}
-
-.navbar-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  max-width: 100%;
-}
-
-.navbar h1 {
-  color: white;
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-.main-content {
-  margin-top: 70px;
-}
-
-.logout-btn {
-  background-color: #ff6b6b;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.3s;
-}
-
-.logout-btn:hover {
-  background-color: #ff5252;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  background-color: #1f2937 !important;
+  z-index: 50 !important;
 }
 
 .logo {
