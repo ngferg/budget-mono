@@ -286,7 +286,8 @@ async function next_month() {
 
 <style scoped>
 .error-text {
-  color: #AA0000;
+  color: #ff6b6b;
+  font-weight: 500;
 }
 
 h1,
@@ -298,21 +299,45 @@ li {
   text-align: left;
 }
 
+h2 {
+  color: #d1fae5;
+  font-size: 1.5em;
+  margin-bottom: 1.5em;
+  display: flex;
+  align-items: center;
+  gap: 1em;
+}
+
+h2 button {
+  padding: 0.4em 0.8em;
+  font-size: 0.8em;
+  min-width: 40px;
+}
+
+button {
+  margin-left: 0.5em;
+}
+
 input {
   border: none;
-  border-bottom: 2px solid #333;
-  background-color: transparent;
-  padding: 4px 0;
+  border-bottom: 2px solid #10b981;
+  background-color: rgba(16, 185, 129, 0.05);
+  padding: 8px 8px;
   font-size: 1em;
+  color: #ffffff;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.2s ease;
 }
 
 input:focus {
   outline: none;
-  border-bottom-color: #0066cc;
+  border-bottom-color: #34d399;
+  background-color: rgba(16, 185, 129, 0.1);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
 }
 
 input::placeholder {
-  color: #999;
+  color: #9ca3af;
 }
 
 .modal-backdrop {
@@ -321,7 +346,8 @@ input::placeholder {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
   z-index: 10;
 }
 
@@ -330,10 +356,11 @@ input::placeholder {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: #222;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(135deg, #1a3a2a 0%, #0f2818 100%);
+  padding: 30px;
+  border-radius: 12px;
+  border: 1px solid #10b981;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), inset 0 0 1px rgba(16, 185, 129, 0.2);
   z-index: 20;
   max-width: 500px;
   width: 90%;
@@ -344,29 +371,32 @@ input::placeholder {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #000;
-  padding-bottom: 10px;
-  margin-bottom: 15px;
+  border-bottom: 2px solid #10b981;
+  padding-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 .modal-header h3 {
   margin: 0;
+  color: #d1fae5;
+  font-size: 1.3em;
 }
 
 .modal-body {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
 
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 20px;
   text-align: left;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
-  color: #666;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #a7f3d0;
+  font-size: 0.95em;
 }
 
 .form-group input {
@@ -380,15 +410,33 @@ input::placeholder {
   justify-content: flex-end;
 }
 
+.modal-footer button:first-child {
+  background-color: #10b981;
+}
+
+.modal-footer button:last-child {
+  background-color: transparent;
+  border: 2px solid #6b7280;
+  color: #9ca3af;
+}
+
+.modal-footer button:last-child:hover {
+  background-color: transparent;
+  border-color: #10b981;
+  color: #10b981;
+}
+
 .close-button {
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   cursor: pointer;
   padding: 0;
+  color: #9ca3af;
+  transition: color 0.2s ease;
 }
 
 .close-button:hover {
-  color: #666;
+  color: #10b981;
 }
 </style>

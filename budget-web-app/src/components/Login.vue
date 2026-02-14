@@ -93,9 +93,7 @@ const login = async () => {
 </script>
 
 <template>
-  <h1>Login</h1>
-
-  <div class="card">
+  <div class="card login-card">
     <div><input type="text" placeholder="email" v-model.trim="email" @keyup.enter="request_code" /></div>
     <div><input type="text" placeholder="code" v-model.trim="code" @keyup.enter="verify_code" v-if="code_requested"
         ref="code_input" />
@@ -107,6 +105,32 @@ const login = async () => {
 
 <style scoped>
 .error-text {
-  color: #AA0000;
+  color: #ff6b6b;
+  font-weight: 500;
+}
+
+input {
+  border: none;
+  border-bottom: 2px solid #10b981;
+  background-color: rgba(16, 185, 129, 0.05);
+  padding: 10px 8px;
+  font-size: 1em;
+  color: #ffffff;
+  border-radius: 4px 4px 0 0;
+  margin-bottom: 1em;
+  width: 100%;
+  max-width: 300px;
+  transition: all 0.2s ease;
+}
+
+input:focus {
+  outline: none;
+  border-bottom-color: #34d399;
+  background-color: rgba(16, 185, 129, 0.1);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+}
+
+input::placeholder {
+  color: #9ca3af;
 }
 </style>

@@ -28,9 +28,10 @@ const handleLogout = () => {
 
 <style scoped>
 nav {
-  background-color: #1f2937 !important;
+  background: linear-gradient(135deg, #065f46 0%, #047857 100%) !important;
   top: 0 !important;
   left: 0 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
 }
 
 :deep(body),

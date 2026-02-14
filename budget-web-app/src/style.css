@@ -9,7 +9,10 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #0f2818;
+  --primary-green: #10b981;
+  --dark-green: #065f46;
+  --light-green: #d1fae5;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -36,27 +39,41 @@ body {
 
 button {
   border-radius: 8px;
-  border: 1px solid transparent;
+  border: 2px solid var(--primary-green);
   padding: 0.6em 1.2em;
   font-size: 1em;
-  font-weight: 500;
+  font-weight: 600;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--primary-green);
+  color: white;
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: all 0.25s ease;
 }
 
 button:hover {
-  border-color: #646cff;
+  background-color: #059669;
+  border-color: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 2px solid var(--primary-green);
+  outline-offset: 2px;
 }
 
 .card {
   padding: 2em;
+  margin-top: 3em;
+  background: linear-gradient(135deg, #1a3a2a 0%, #0f2818 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 0 1px rgba(16, 185, 129, 0.1);
+}
+
+.login-card {
+  margin-top: 10em;
 }
 
 #app {
