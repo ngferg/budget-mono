@@ -20,3 +20,14 @@ run-dev-webapp:
 .PHONY: run-auth
 run-auth:
 	cargo run --bin auth-svc
+
+.PHONY: run-prod-webapp
+run-prod-webapp:
+	npm run build
+	sudo cp -r ./budget-web-app/dist/ /var/www/
+    sudo systemctl restart nginx
+
+.PHONY: build-prod-binaries
+build-prod-binaries:
+	cargo build --release --bin auth-svc
+	cargo build --release --bin budget-rest
