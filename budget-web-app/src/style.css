@@ -46,7 +46,7 @@ button:focus-visible {
 .card {
   padding: 2em;
   margin-top: 3em;
-  background: linear-gradient(135deg, #1a3a2a 0%, #0f2818 100%);
+  background: linear-gradient(135deg, #0d2016 0%, #012305 100%);
   border-radius: 12px;
   border: 1px solid rgba(16, 185, 129, 0.3);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 0 1px rgba(16, 185, 129, 0.1);
@@ -93,4 +93,19 @@ button:hover {
   background: rgba(16, 185, 129, 0.3);
   border-color: #34d399;
   transform: scale(1.05);
+}
+
+/* For WebKit-based browsers (Chrome, Safari, Opera) */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* For Internet Explorer and Edge */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+}
+
+/* For Firefox */
+.hide-scrollbar {
+  scrollbar-width: none;
 }
