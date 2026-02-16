@@ -24,7 +24,7 @@ const handleBudget = () => {
 <template>
   <nav class="fixed top-0 left-0 right-0 z-50 w-screen bg-gray-800 py-1 shadow-md m-0">
     <div class="flex justify-between items-center px-8">
-      <h1 class="text-white m-0 text-sm"><img src="/fe.png" class="h-16 w-16 mr-2" alt="febudget.com" /></h1>
+      <h1 class="text-white m-0 text-sm"><img src="/fe.png" class="h-16 w-16 mr-2 rounded" alt="febudget.com" /></h1>
       <div class="flex gap-4 items-center">
         <button v-if="store.is_logged_in && !show_resources" @click="handleResources">Resources</button>
         <button v-if="store.is_logged_in && show_resources" @click="handleBudget">Budget</button>
