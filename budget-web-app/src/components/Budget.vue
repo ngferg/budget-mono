@@ -234,9 +234,17 @@ async function next_month() {
     <div v-if="last_month_clonable">
       <button @click="clone_last_month">Clone Last Month's Budget</button>
     </div>
-    <h3>Categories:</h3>
+    <h3 class="text-2xl font-bold text-emerald-300 mt-6 mb-4 border-b-2 border-emerald-500 pb-2">Overview:</h3>
+    <h4 class="text-lg font-semibold text-emerald-200 mb-2 pl-4">
+      Income: {{formatCents(budget[categories[0]?.id]?.map(item => item.amount).reduce((a, c) => a + c, 0) || 0)}}
+    </h4>
+    <h4 class="text-lg font-semibold text-emerald-200 mb-2 pl-4">
+      Expenses: {{formatCents(categories.slice(1).flatMap(cat => budget[cat.id] || []).reduce((sum, item) => sum +
+        item.amount, 0))}}
+    </h4>
+    <h3 class="text-2xl font-bold text-emerald-300 mt-8 mb-4 border-b-2 border-emerald-500 pb-2">Categories:</h3>
     <div>
-      <h4 v-for="category in categories" :key="category.id">
+      <h4 v-for="category in categories" :key="category.id" class="text-xl font-bold text-emerald-100 mt-6 mb-3">
         {{ category.name }}: {{formatCents(budget[category.id].map(item => item.amount).reduce((a, c) => a + c, 0))}}
         <ul>
           <li v-for="item in budget[category.id]" :key="item.id">
