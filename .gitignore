@@ -21,3 +21,4 @@ target
 .idea/
 
 budget-lib/dbs/*
+.DS_Store

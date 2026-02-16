@@ -13,7 +13,7 @@ const handleLogout = () => {
 <template>
   <nav class="fixed top-0 left-0 right-0 z-50 w-screen bg-gray-800 py-1 shadow-md m-0">
     <div class="flex justify-between items-center px-8">
-      <h1 class="text-white m-0 text-sm">febudget.com</h1>
+      <h1 class="text-white m-0 text-sm"><img src="/fe.png" class="h-12 w-12 mr-2" alt="febudget.com" /></h1>
       <button v-if="store.is_logged_in" @click="handleLogout"
         class="bg-red-500 text-white px-4 py-1 rounded cursor-pointer text-sm transition-colors hover:bg-red-600">
         Log Out
