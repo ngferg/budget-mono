@@ -10,11 +10,15 @@ post {
   auth: inherit
 }
 
+headers {
+  Authorization: {{token}}
+}
+
 body:json {
   {
-    "email": "cool-guy@example.com",
+    "email": "nicholausferguson@icloud.com",
     "year": 2026,
-    "month": 1
+    "month": 14
   }
 }
 

@@ -25,6 +25,8 @@ pub enum GetBudgetError {
     UserDoesntExists(),
     #[error("Budget doesn't exists")]
     BudgetDoesntExists(),
+    #[error("Date Error: {0}")]
+    DateError(DateError),
     #[error("Internal Error: {0}")]
     Internal(String),
 }
@@ -107,16 +109,16 @@ pub struct EditLineItemRequest {
 pub struct GetBudgetRequest {
     pub email: String,
     pub year: u32,
-    pub month: u32,
+    pub month: Month,
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct CloneMonthRequest {
     pub email: String,
     pub source_year: u32,
-    pub source_month: u32,
+    pub source_month: Month,
     pub target_year: u32,
-    pub target_month: u32,
+    pub target_month: Month,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -151,4 +153,32 @@ pub struct LineItem {
     pub description: String,
     pub amount: u64,
     pub category: u64,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum DateError {
+    #[error("Invalid year")]
+    InvalidYear(),
+    #[error("Invalid month")]
+    InvalidMonth(),
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(try_from = "u8")]
+pub struct Month(u8);
+impl TryFrom<u8> for Month {
+    type Error = DateError;
+
+    fn try_from(raw: u8) -> Result<Self, Self::Error> {
+        if raw < 1 || raw > 12 {
+            Err(DateError::InvalidMonth())
+        } else {
+            Ok(Month(raw))
+        }
+    }
+}
+impl Month {
+    pub fn inner(&self) -> u8 {
+        self.0
+    }
 }

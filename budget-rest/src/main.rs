@@ -68,6 +68,13 @@ async fn find_budget(
                 http::StatusCode::NOT_FOUND,
                 axum::Json(serde_json::from_str("{}").unwrap_or_default()),
             ),
+            budget_lib::types::GetBudgetError::DateError(e) => (
+                http::StatusCode::BAD_REQUEST,
+                axum::Json(
+                    serde_json::from_str(format!("{{\"error\": \"{e}\"}}").as_str())
+                        .unwrap_or_default(),
+                ),
+            ),
         },
     }
 }

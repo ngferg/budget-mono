@@ -161,7 +161,7 @@ impl Dao for SqliteDao {
                 types::GetBudgetError::Internal("Failed to select line_items".to_string())
             })?;
         let budget_iter = budget_stmt
-            .query_map(rusqlite::params![req.year, req.month], |row| {
+            .query_map(rusqlite::params![req.year, req.month.inner()], |row| {
                 Ok(types::LineItem {
                     id: row.get(0)?,
                     description: row.get(1)?,
@@ -183,8 +183,12 @@ impl Dao for SqliteDao {
             }
         });
 
-        let last_month = if req.month == 1 { 12 } else { req.month - 1 };
-        let last_year = if req.month == 1 {
+        let last_month = if req.month.inner() == 1 {
+            12
+        } else {
+            req.month.inner() - 1
+        };
+        let last_year = if req.month.inner() == 1 {
             req.year - 1
         } else {
             req.year
@@ -220,7 +224,7 @@ impl Dao for SqliteDao {
             })?;
         let line_item_iter = select_stmt
             .query_map(
-                rusqlite::params![req.source_year, req.source_month],
+                rusqlite::params![req.source_year, req.source_month.inner()],
                 |row| {
                     Ok((
                         row.get::<_, String>(0)?,
@@ -249,7 +253,7 @@ impl Dao for SqliteDao {
                     amount,
                     category,
                     req.target_year,
-                    req.target_month
+                    req.target_month.inner()
                 ])
                 .map_err(|e| {
                     types::CloneMonthError::Internal(format!("Failed to insert line_item: {e}"))
