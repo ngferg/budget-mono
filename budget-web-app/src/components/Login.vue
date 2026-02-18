@@ -13,6 +13,10 @@ const code_input = ref(null);
 
 const request_code = async () => {
   console.log("Request code for: " + email.value);
+  code_requested.value = true;
+  nextTick(() => {
+    code_input.value.focus();
+  });
   try {
     const resp = await fetch(AUTH_BASE_URL + '/request_code', {
       method: 'POST',
@@ -23,12 +27,7 @@ const request_code = async () => {
         'email': email.value,
       })
     });
-    if (resp.status === 200) {
-      code_requested.value = true;
-      nextTick(() => {
-        code_input.value.focus();
-      });
-    } else {
+    if (resp.status !== 200) {
       error.value = "Error: " + resp.status;
       store.log_out();
     }
