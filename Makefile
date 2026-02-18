@@ -30,4 +30,6 @@ run-prod-webapp:
 .PHONY: build-prod-binaries
 build-prod-binaries:
 	cargo build --release --bin auth-svc
+	sudo systemctl restart bauth.service
 	cargo build --release --bin budget-rest
+	sudo systemctl restart bapi.service
