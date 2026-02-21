@@ -52,6 +52,8 @@ pub async fn get_budget(
 ) -> Result<types::GetBudgetResponse, types::GetBudgetError> {
     use dao::Dao as dao_trait;
 
+    get_budget_request.validate()?;
+
     let dao = dao::sqlite_dao::SqliteDao::try_new()
         .inspect_err(|e| eprintln!("Failed to create sqlite dao: {}", e.to_string()))
         .unwrap();

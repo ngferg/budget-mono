@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, computed } from 'vue'
 import { store } from '../store.js'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
@@ -17,6 +17,13 @@ const edit_item_description = ref("");
 const edit_item_amount = ref("");
 const edit_description_input = ref(null);
 const last_month_clonable = ref(false);
+const show_back_button = computed(() => {
+  return year.value > 2026 || (year.value === 2026 && month.value > 1);
+});
+const show_forward_button = computed(() => {
+  const current_year = new Date().getFullYear();
+  return year.value < current_year + 3 || (year.value === current_year + 3 && month.value < 12);
+});
 
 const get_budget = async () => {
   console.log("Get budget for: " + store.get_email());
@@ -229,8 +236,9 @@ async function next_month() {
   </div>
 
   <div v-if="budget !== null" class="card">
-    <h2><button @click="last_month">&lt;</button>Budget for {{ month }}/{{ year }}<button
-        @click="next_month">&gt;</button></h2>
+    <h2 class="justify-center"><button @click="last_month" v-if="show_back_button">&lt;</button>Budget for {{ month
+    }}/{{ year
+      }}<button @click="next_month" v-if="show_forward_button">&gt;</button></h2>
     <div v-if="last_month_clonable">
       <button @click="clone_last_month">Clone Last Month's Budget</button>
     </div>

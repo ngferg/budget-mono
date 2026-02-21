@@ -1,6 +1,8 @@
 pub(crate) mod dao;
 use std::collections;
 
+use chrono::Datelike;
+
 #[derive(thiserror::Error, Debug)]
 pub enum CreateUserError {
     #[error("Email improperly formatted")]
@@ -110,6 +112,16 @@ pub struct GetBudgetRequest {
     pub email: String,
     pub year: u32,
     pub month: Month,
+}
+
+impl GetBudgetRequest {
+    pub fn validate(&self) -> Result<(), GetBudgetError> {
+        let current_year = chrono::Utc::now().year() as u32;
+        if self.year < 2026 || self.year > current_year + 3 {
+            return Err(GetBudgetError::DateError(DateError::InvalidYear()));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
