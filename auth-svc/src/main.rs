@@ -9,6 +9,9 @@ static FROM_ADDR: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 static SMTP_PASSWORD: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 static SMTP_HOST: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
+const CODE_EXPIRATION_MINUTES: i64 = 10;
+const CODE_CLEANUP_INTERVAL_SECONDS: u64 = 60;
+
 #[derive(Clone)]
 struct AppState {
     code_map: std::sync::Arc<
@@ -36,6 +39,28 @@ async fn main() {
         code_map: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         token_map: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
     };
+
+    let cache_cleanup_monitor = tokio::spawn({
+        println!(
+            "Starting code cleanup task with an interval of {CODE_CLEANUP_INTERVAL_SECONDS} seconds"
+        );
+        let state = state.clone();
+        async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(
+                    CODE_CLEANUP_INTERVAL_SECONDS,
+                ))
+                .await;
+                let mut code_map = state.code_map.write().await;
+                let now = chrono::Utc::now();
+                code_map.retain(|_, v| {
+                    now.signed_duration_since(v.1)
+                        < chrono::Duration::minutes(CODE_EXPIRATION_MINUTES)
+                });
+            }
+        }
+    });
+
     // CORS configuration
     let cors = CorsLayer::permissive();
     // our router
@@ -51,6 +76,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
     println!("Auth service starting on port 3001");
     axum::serve(listener, app).await.unwrap();
+    cache_cleanup_monitor.abort();
 }
 
 // which calls one of these handlers
