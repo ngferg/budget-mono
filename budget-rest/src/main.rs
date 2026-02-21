@@ -213,7 +213,6 @@ async fn verify_auth(headers: axum::http::HeaderMap, email: &str) -> Result<(), 
             let res = budget_lib::check_token(email, token_str).await;
             match res {
                 Err(e) => {
-                    println!("Auth error: {e}");
                     return Err(http::StatusCode::UNAUTHORIZED);
                 }
                 Ok(()) => Ok(()),

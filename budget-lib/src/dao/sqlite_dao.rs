@@ -7,12 +7,10 @@ pub(crate) struct SqliteDao {
 
 impl Dao for SqliteDao {
     fn create_user(&self, req: &types::CreateUserRequest) -> Result<(), types::CreateUserError> {
-        println!("Got a request to create a user: {}", req.email);
         if !req.email.contains("@") {
             return Err(types::CreateUserError::EmailImproperlyFormatted());
         }
         let email_sha = sha256::digest(req.email.clone());
-        println!("Attempting to create db: {}", email_sha);
         let sqlite_file_path = format!("{}/{}.db", self.db_folder, email_sha);
         let sqlite_file = std::fs::OpenOptions::new()
             .write(true)
@@ -28,10 +26,7 @@ impl Dao for SqliteDao {
                 conn.execute_batch(ddl.as_str()).unwrap();
                 Ok(())
             }
-            Err(e) => {
-                println!("Fail: {}", e);
-                Err(types::CreateUserError::UserAlreadyExists())
-            }
+            Err(e) => Err(types::CreateUserError::UserAlreadyExists()),
         }
     }
 
@@ -39,7 +34,6 @@ impl Dao for SqliteDao {
         &self,
         req: &types::AddLineItemRequest,
     ) -> Result<(), types::AddLineItemError> {
-        println!("Got a request to add line item: {:?}", req);
         let conn = self
             .get_conn(req.email.clone())
             .map_err(|_| types::AddLineItemError::UserDoesntExists())?;
@@ -66,7 +60,6 @@ impl Dao for SqliteDao {
         &self,
         req: &types::EditLineItemRequest,
     ) -> Result<(), types::EditLineItemError> {
-        println!("Got a request to edit line item: {:?}", req);
         let conn = self
             .get_conn(req.email.clone())
             .map_err(|_| types::EditLineItemError::UserDoesntExists())?;
@@ -84,9 +77,7 @@ impl Dao for SqliteDao {
     }
 
     fn delete_user(&self, req: &types::DeleteUserRequest) -> Result<(), types::DeleteUserError> {
-        println!("Got a request to delte user: {}", req.email);
         let email_sha = sha256::digest(req.email.clone());
-        println!("Attempting to delete db: {}", email_sha);
         let sqlite_file_path = format!("{}/{}.db", self.db_folder, email_sha);
         let res = std::fs::remove_file(sqlite_file_path);
         match res {
@@ -99,7 +90,6 @@ impl Dao for SqliteDao {
         &self,
         req: &types::DeleteLineItemRequest,
     ) -> Result<(), types::DeleteLineItemError> {
-        println!("Got a request to delete line item: {:?}", req);
         let conn = self
             .get_conn(req.email.clone())
             .map_err(|_| types::DeleteLineItemError::UserDoesntExists())?;
@@ -123,7 +113,6 @@ impl Dao for SqliteDao {
         &self,
         req: &types::GetBudgetRequest,
     ) -> Result<types::GetBudgetResponse, types::GetBudgetError> {
-        println!("Got a request to fetch budget: {:?}", req);
         let conn = self
             .get_conn(req.email.clone())
             .map_err(|_| types::GetBudgetError::UserDoesntExists())?;
@@ -212,7 +201,6 @@ impl Dao for SqliteDao {
     }
 
     fn clone_month(&self, req: &types::CloneMonthRequest) -> Result<(), types::CloneMonthError> {
-        println!("Got a request to clone month: {:?}", req);
         let conn = self
             .get_conn(req.email.clone())
             .map_err(|_| types::CloneMonthError::UserDoesntExists())?;

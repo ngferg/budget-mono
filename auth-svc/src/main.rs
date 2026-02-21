@@ -75,7 +75,6 @@ async fn request_code(
         let mut code_map = state.code_map.write().await;
         code_map.insert(email_sha.clone(), code.clone());
     }
-    println!("Generated code {code} for email {email_sha}");
     // Build a simple multipart message
     let to_addr = req.email.clone();
     let from_email = FROM_ADDR.get().map(|s| s.as_str()).unwrap_or("");
@@ -110,7 +109,6 @@ async fn verify_code(
     State(state): State<AppState>,
     Json(req): Json<types::VerifyCodeRequest>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
-    println!("Login request: {req:?}");
     let code_map = state.code_map.read().await;
     let hashed_email = sha256::digest(req.email.clone());
     let code = code_map.get(&hashed_email);
@@ -145,7 +143,6 @@ async fn verify_token(
     State(state): State<AppState>,
     Json(req): Json<types::VerifyTokenRequest>,
 ) -> axum::http::StatusCode {
-    println!("Verify token request: {:?}", req);
     let token_map = state.token_map.read().await;
     let stored_token = token_map.get(&sha256::digest(req.email.clone()));
     match stored_token {
