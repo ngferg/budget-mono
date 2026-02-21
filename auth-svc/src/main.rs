@@ -11,7 +11,11 @@ static SMTP_HOST: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 #[derive(Clone)]
 struct AppState {
-    code_map: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<String, String>>>,
+    code_map: std::sync::Arc<
+        tokio::sync::RwLock<
+            std::collections::HashMap<String, (String, chrono::DateTime<chrono::Utc>)>,
+        >,
+    >,
     token_map: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<String, String>>>,
 }
 
@@ -74,7 +78,7 @@ async fn request_code(
     };
     {
         let mut code_map = state.code_map.write().await;
-        code_map.insert(email_sha.clone(), code.clone());
+        code_map.insert(email_sha.clone(), (code.clone(), chrono::Utc::now()));
     }
     // Build a simple multipart message
     let to_addr = req.email.clone();
@@ -115,7 +119,9 @@ async fn verify_code(
     let code = code_map.get(&hashed_email);
     match code {
         Some(stored_code) => {
-            if *stored_code == req.code {
+            if *stored_code.0 == req.code {
+                drop(code_map);
+                state.code_map.write().await.remove(&hashed_email);
                 let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 64);
                 let res = types::VerifyCodeResponse { token };
                 {
