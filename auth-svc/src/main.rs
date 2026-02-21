@@ -40,6 +40,7 @@ async fn main() {
         .route("/request_code", routing::post(request_code))
         .route("/verify_code", routing::post(verify_code))
         .route("/verify_token", routing::post(verify_token))
+        .route("/logout", routing::post(logout))
         .layer(cors)
         .with_state(state);
 
@@ -148,6 +149,31 @@ async fn verify_token(
     match stored_token {
         Some(t) => {
             if *t == req.token {
+                axum::http::StatusCode::OK
+            } else {
+                axum::http::StatusCode::UNAUTHORIZED
+            }
+        }
+        _ => axum::http::StatusCode::UNAUTHORIZED,
+    }
+}
+
+async fn logout(
+    State(state): State<AppState>,
+    Json(req): Json<types::VerifyTokenRequest>,
+) -> axum::http::StatusCode {
+    println!("Logout request {req:?}");
+    let token_map = state.token_map.read().await;
+    let stored_token = token_map.get(&sha256::digest(req.email.clone()));
+    match stored_token {
+        Some(t) => {
+            if *t == req.token {
+                drop(token_map);
+                state
+                    .token_map
+                    .write()
+                    .await
+                    .remove(&sha256::digest(req.email.clone()));
                 axum::http::StatusCode::OK
             } else {
                 axum::http::StatusCode::UNAUTHORIZED

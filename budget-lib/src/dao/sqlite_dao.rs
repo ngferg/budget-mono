@@ -26,7 +26,7 @@ impl Dao for SqliteDao {
                 conn.execute_batch(ddl.as_str()).unwrap();
                 Ok(())
             }
-            Err(e) => Err(types::CreateUserError::UserAlreadyExists()),
+            Err(_) => Err(types::CreateUserError::UserAlreadyExists()),
         }
     }
 
@@ -82,7 +82,9 @@ impl Dao for SqliteDao {
         let res = std::fs::remove_file(sqlite_file_path);
         match res {
             Ok(_) => Ok(()),
-            Err(e) => Err(types::DeleteUserError::Internal(e.to_string())),
+            Err(_) => Err(types::DeleteUserError::Internal(
+                "Failed to delete user".to_string(),
+            )),
         }
     }
 
