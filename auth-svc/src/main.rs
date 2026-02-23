@@ -11,6 +11,8 @@ static SMTP_HOST: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 const CODE_EXPIRATION_MINUTES: i64 = 10;
 const CODE_CLEANUP_INTERVAL_SECONDS: u64 = 60;
+const TOKEN_EXPIRATION_DAYS: i64 = 7;
+const TOKEN_CLEANUP_INTERVAL_SECONDS: u64 = 3600;
 
 #[derive(Clone)]
 struct AppState {
@@ -19,7 +21,7 @@ struct AppState {
             std::collections::HashMap<String, (String, chrono::DateTime<chrono::Utc>)>,
         >,
     >,
-    token_map: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<String, String>>>,
+    token_map: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<String, (String, chrono::DateTime<chrono::Utc>)>>>,
 }
 
 #[tokio::main]
@@ -39,6 +41,27 @@ async fn main() {
         code_map: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         token_map: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
     };
+
+    let token_cleanup_monitor = tokio::spawn({
+        println!(
+            "Starting token cleanup task with an interval of {TOKEN_CLEANUP_INTERVAL_SECONDS} seconds"
+        );
+        let state = state.clone();
+        async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(
+                    TOKEN_CLEANUP_INTERVAL_SECONDS,
+                ))
+                .await;
+                let mut token_map = state.token_map.write().await;
+                let now = chrono::Utc::now();
+                token_map.retain(|_, v| {
+                    now.signed_duration_since(v.1)
+                        < chrono::Duration::days(TOKEN_EXPIRATION_DAYS)
+                });
+            }
+        }
+    });
 
     let cache_cleanup_monitor = tokio::spawn({
         println!(
@@ -77,6 +100,7 @@ async fn main() {
     println!("Auth service starting on port 3001");
     axum::serve(listener, app).await.unwrap();
     cache_cleanup_monitor.abort();
+    token_cleanup_monitor.abort();
 }
 
 // which calls one of these handlers
@@ -152,7 +176,7 @@ async fn verify_code(
                 let res = types::VerifyCodeResponse { token };
                 {
                     let mut token_map = state.token_map.write().await;
-                    token_map.insert(hashed_email, res.token.clone());
+                    token_map.insert(hashed_email, (res.token.clone(), chrono::Utc::now()));
                 }
                 return (
                     axum::http::StatusCode::OK,
@@ -180,7 +204,14 @@ async fn verify_token(
     let stored_token = token_map.get(&sha256::digest(req.email.clone()));
     match stored_token {
         Some(t) => {
-            if *t == req.token {
+            if t.0 == req.token {
+                drop(token_map);
+                state
+                    .token_map
+                    .write()
+                    .await
+                    .entry(sha256::digest(req.email.clone()))
+                    .and_modify(|v| v.1 = chrono::Utc::now());
                 axum::http::StatusCode::OK
             } else {
                 axum::http::StatusCode::UNAUTHORIZED
@@ -199,7 +230,7 @@ async fn logout(
     let stored_token = token_map.get(&sha256::digest(req.email.clone()));
     match stored_token {
         Some(t) => {
-            if *t == req.token {
+            if t.0 == req.token {
                 drop(token_map);
                 state
                     .token_map
