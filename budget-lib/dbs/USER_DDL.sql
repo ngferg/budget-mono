@@ -11,6 +11,9 @@ VALUES
   ('House', 1),
   ('Utilities', 1),
   ('Transportation', 1),
+  ('Food', 1),
+  ('Entertainment', 1),
+  ('Health', 1),
   ('Charity', 1);
 
 CREATE TABLE IF NOT EXISTS budget (

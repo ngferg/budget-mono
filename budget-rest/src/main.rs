@@ -20,6 +20,7 @@ async fn main() {
                 .put(edit_line_item),
         )
         .route("/users/budget/clone_month", post(clone_month))
+        .route("/users/budget/category", post(add_category))
         .layer(cors);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -174,6 +175,25 @@ async fn edit_line_item(
                 http::StatusCode::NOT_FOUND
             }
             budget_lib::types::EditLineItemError::Internal(_) => {
+                http::StatusCode::INTERNAL_SERVER_ERROR
+            }
+        },
+    }
+}
+
+async fn add_category(
+    headers: axum::http::HeaderMap,
+    axum::extract::Json(req): axum::extract::Json<budget_lib::types::AddCategoryRequest>,
+) -> http::StatusCode {
+    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+        return e;
+    }
+    let res = budget_lib::add_category(req).await;
+    match res {
+        Ok(()) => http::StatusCode::CREATED,
+        Err(e) => match e {
+            budget_lib::types::AddCategoryError::UserDoesntExists() => http::StatusCode::NOT_FOUND,
+            budget_lib::types::AddCategoryError::Internal(_) => {
                 http::StatusCode::INTERNAL_SERVER_ERROR
             }
         },

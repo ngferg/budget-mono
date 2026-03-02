@@ -20,4 +20,5 @@ pub trait Dao {
         req: &types::GetBudgetRequest,
     ) -> Result<types::GetBudgetResponse, types::GetBudgetError>;
     fn clone_month(&self, req: &types::CloneMonthRequest) -> Result<(), types::CloneMonthError>;
+    fn add_category(&self, req: &types::AddCategoryRequest) -> Result<(), types::AddCategoryError>;
 }

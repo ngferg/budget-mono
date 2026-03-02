@@ -73,6 +73,16 @@ pub async fn edit_line_item(
     Ok(())
 }
 
+pub async fn add_category(req: types::AddCategoryRequest) -> Result<(), types::AddCategoryError> {
+    use dao::Dao as dao_trait;
+
+    let dao = dao::sqlite_dao::SqliteDao::try_new()
+        .inspect_err(|e| eprintln!("Failed to create sqlite dao: {}", e.to_string()))
+        .unwrap();
+    let _ = dao.add_category(&req)?;
+    Ok(())
+}
+
 pub async fn clone_last_month(req: types::CloneMonthRequest) -> Result<(), types::CloneMonthError> {
     use dao::Dao as dao_trait;
 

@@ -202,6 +202,23 @@ impl Dao for SqliteDao {
         })
     }
 
+    fn add_category(&self, req: &types::AddCategoryRequest) -> Result<(), types::AddCategoryError> {
+        let conn = self
+            .get_conn(req.email.clone())
+            .map_err(|_| types::AddCategoryError::UserDoesntExists())?;
+        let mut insert_stmt = conn
+            .prepare("INSERT INTO categories (category, is_expense) VALUES (?, ?)")
+            .map_err(|_| {
+                types::AddCategoryError::Internal("Failed to prepare insert statement".to_string())
+            })?;
+        insert_stmt
+            .execute(rusqlite::params![req.category, req.is_expense])
+            .map_err(|e| {
+                types::AddCategoryError::Internal(format!("Failed to insert category: {e}"))
+            })?;
+        Ok(())
+    }
+
     fn clone_month(&self, req: &types::CloneMonthRequest) -> Result<(), types::CloneMonthError> {
         let conn = self
             .get_conn(req.email.clone())

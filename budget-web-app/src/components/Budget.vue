@@ -17,6 +17,7 @@ const edit_item_description = ref("");
 const edit_item_amount = ref("");
 const edit_description_input = ref(null);
 const last_month_clonable = ref(false);
+const new_category_name = ref('');
 const show_back_button = computed(() => {
   return year.value > 2026 || (year.value === 2026 && month.value > 1);
 });
@@ -228,6 +229,35 @@ async function next_month() {
   }
   await get_budget();
 }
+
+const add_category = async () => {
+  if (new_category_name.value === '') {
+    console.error('Error: Category name is required.');
+    return;
+  }
+  try {
+    const resp = await fetch(API_BASE_URL + '/users/budget/category', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': store.get_token(),
+      },
+      body: JSON.stringify({
+        'email': store.get_email(),
+        'category': new_category_name.value,
+        'is_expense': true,
+      })
+    });
+    if (resp.status === 201) {
+      new_category_name.value = '';
+      await get_budget();
+    } else {
+      error.value = 'Error: ' + resp.status;
+    }
+  } catch (e) {
+    error.value = 'Error: ' + e.message;
+  }
+};
 </script>
 
 <template>
@@ -268,6 +298,11 @@ async function next_month() {
 
         </ul>
       </h4>
+    </div>
+    <h3 class="text-2xl font-bold text-emerald-300 mt-8 mb-4 border-b-2 border-emerald-500 pb-2">Add Category:</h3>
+    <div class="add-category-row">
+      <input type="text" placeholder="Category name" v-model="new_category_name" @keydown.enter="add_category" />
+      <button @click="add_category">+</button>
     </div>
   </div>
 
@@ -485,5 +520,25 @@ input::placeholder {
 
 .close-button:hover {
   color: #10b981;
+}
+
+.add-category-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.75em 1em;
+  background: rgba(16, 185, 129, 0.03);
+  border-radius: 8px;
+  border-left: 3px dashed #6b7280;
+  margin-top: 0.5em;
+}
+
+.add-category-row:hover {
+  background: rgba(16, 185, 129, 0.08);
+  border-left-color: #10b981;
+}
+
+.add-category-row input[type="text"] {
+  flex: 1;
 }
 </style>

@@ -62,6 +62,14 @@ pub enum EditLineItemError {
 }
 
 #[derive(thiserror::Error, Debug)]
+pub enum AddCategoryError {
+    #[error("User doesn't exists")]
+    UserDoesntExists(),
+    #[error("Internal Error: {0}")]
+    Internal(String),
+}
+
+#[derive(thiserror::Error, Debug)]
 pub enum CloneMonthError {
     #[error("User doesn't exists")]
     UserDoesntExists(),
@@ -122,6 +130,13 @@ impl GetBudgetRequest {
         }
         Ok(())
     }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct AddCategoryRequest {
+    pub email: String,
+    pub category: String,
+    pub is_expense: bool,
 }
 
 #[derive(Debug, serde::Deserialize)]
