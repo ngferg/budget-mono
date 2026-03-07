@@ -54,12 +54,12 @@ async fn find_budget(
     match res {
         Ok(res) => (
             http::StatusCode::OK,
-            axum::Json(serde_json::to_value(res).expect("json conversion should work")),
+            axum::Json(serde_json::to_value(res).unwrap_or_default()),
         ),
         Err(e) => match e {
             budget_lib::types::GetBudgetError::Internal(e) => (
                 http::StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(serde_json::to_value(e).expect("json conversion should work")),
+                axum::Json(serde_json::to_value(e).unwrap_or_default()),
             ),
             budget_lib::types::GetBudgetError::UserDoesntExists() => (
                 http::StatusCode::NOT_FOUND,

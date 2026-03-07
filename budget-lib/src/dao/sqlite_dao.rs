@@ -18,12 +18,17 @@ impl Dao for SqliteDao {
             .open(sqlite_file_path.clone());
         match sqlite_file {
             Ok(_) => {
-                let conn = rusqlite::Connection::open(sqlite_file_path)
-                    .expect("Failed to open checked sqlite db");
+                let conn = rusqlite::Connection::open(sqlite_file_path).map_err(|_| {
+                    types::CreateUserError::Internal("Failed to create user database".to_string())
+                })?;
 
                 let ddl = std::fs::read_to_string(format!("{}/USER_DDL.sql", self.db_folder))
-                    .expect("DDL sql is missing");
-                conn.execute_batch(ddl.as_str()).unwrap();
+                    .map_err(|_| {
+                        types::CreateUserError::Internal("DDL sql is missing".to_string())
+                    })?;
+                conn.execute_batch(ddl.as_str()).map_err(|_| {
+                    types::CreateUserError::Internal("Failed to execute DDL".to_string())
+                })?;
                 Ok(())
             }
             Err(_) => Err(types::CreateUserError::UserAlreadyExists()),
