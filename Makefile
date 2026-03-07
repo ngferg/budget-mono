@@ -24,6 +24,7 @@ run-auth:
 .PHONY: run-prod-webapp
 run-prod-webapp:
 	git pull
+	npm install --prefix ./budget-web-app
 	npm run build --prefix ./budget-web-app
 	sudo cp -r ./budget-web-app/dist/ /var/www/
 	sudo systemctl restart nginx
