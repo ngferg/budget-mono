@@ -21,7 +21,11 @@ struct AppState {
             std::collections::HashMap<String, (String, chrono::DateTime<chrono::Utc>)>,
         >,
     >,
-    token_map: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<String, (String, chrono::DateTime<chrono::Utc>)>>>,
+    token_map: std::sync::Arc<
+        tokio::sync::RwLock<
+            std::collections::HashMap<String, (String, chrono::DateTime<chrono::Utc>)>,
+        >,
+    >,
 }
 
 #[tokio::main]
@@ -56,8 +60,7 @@ async fn main() {
                 let mut token_map = state.token_map.write().await;
                 let now = chrono::Utc::now();
                 token_map.retain(|_, v| {
-                    now.signed_duration_since(v.1)
-                        < chrono::Duration::days(TOKEN_EXPIRATION_DAYS)
+                    now.signed_duration_since(v.1) < chrono::Duration::days(TOKEN_EXPIRATION_DAYS)
                 });
             }
         }
@@ -144,19 +147,24 @@ async fn request_code(
 
     // Connect to the SMTP submissions port, upgrade to TLS and
     // authenticate using the provided credentials.
-    let res =
+    let smtp_client =
         mail_send::SmtpClientBuilder::new(SMTP_HOST.get().map(|s| s.as_str()).unwrap_or(""), 587)
             .implicit_tls(false)
             .credentials((from_email, smtp_pass))
             .connect()
-            .await
-            .expect("Failed to connect to SMTP server")
-            .send(message)
-            .await
-            .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR);
-    match res {
-        Ok(_) => axum::http::StatusCode::OK,
-        Err(e) => e,
+            .await;
+    match smtp_client {
+        Ok(mut smtp_client) => {
+            let res = smtp_client
+                .send(message)
+                .await
+                .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+            match res {
+                Ok(_) => axum::http::StatusCode::OK,
+                Err(e) => e,
+            }
+        }
+        Err(_) => return axum::http::StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
@@ -180,7 +188,7 @@ async fn verify_code(
                 }
                 return (
                     axum::http::StatusCode::OK,
-                    axum::Json(serde_json::to_value(res).expect("json conversion should work")),
+                    axum::Json(serde_json::to_value(res).unwrap_or_default()),
                 );
             } else {
                 return (
