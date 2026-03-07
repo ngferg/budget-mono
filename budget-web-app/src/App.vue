@@ -1,15 +1,24 @@
 <script setup>
 import { store } from './store.js'
+import Landing from './components/Landing.vue'
 import Login from './components/Login.vue'
 import Budget from './components/Budget.vue'
 import Resources from './components/Resources.vue'
 import { ref } from 'vue'
 
+// Determine initial view
+function initialView() {
+  if (store.is_logged_in) return 'app';
+  if (store.has_ever_logged_in()) return 'login';
+  return 'landing';
+}
+
+const view = ref(initialView());
 const show_resources = ref(false);
 
-const handleLogout = () => {
-  store.log_out();
-  location.reload();
+const handleLogout = async () => {
+  await store.log_out();
+  view.value = 'login';
 }
 
 const handleResources = () => {
@@ -19,6 +28,18 @@ const handleResources = () => {
 const handleBudget = () => {
   show_resources.value = false;
 }
+
+const handleLoginSuccess = () => {
+  view.value = 'app';
+}
+
+const goToLogin = () => {
+  view.value = 'login';
+}
+
+const goToLanding = () => {
+  view.value = 'landing';
+}
 </script>
 
 <template>
@@ -26,9 +47,20 @@ const handleBudget = () => {
     <div class="flex justify-between items-center px-8">
       <h1 class="text-white m-0 text-sm"><img src="/fe.png" class="h-16 w-16 mr-2 rounded" alt="febudget.com" /></h1>
       <div class="flex gap-4 items-center">
-        <button v-if="store.is_logged_in && !show_resources" @click="handleResources">Resources</button>
-        <button v-if="store.is_logged_in && show_resources" @click="handleBudget">Budget</button>
-        <button v-if="store.is_logged_in" @click="handleLogout"
+        <!-- Landing page -->
+        <button v-if="view === 'landing'" @click="goToLogin"
+          class="bg-white text-green-800 px-4 py-1 rounded cursor-pointer text-sm font-semibold transition-colors hover:bg-gray-100">
+          Login
+        </button>
+        <!-- Login page -->
+        <button v-if="view === 'login'" @click="goToLanding"
+          class="text-white px-4 py-1 rounded cursor-pointer text-sm transition-colors hover:bg-white/10">
+          About
+        </button>
+        <!-- Logged-in app -->
+        <button v-if="view === 'app' && !show_resources" @click="handleResources">Resources</button>
+        <button v-if="view === 'app' && show_resources" @click="handleBudget">Budget</button>
+        <button v-if="view === 'app'" @click="handleLogout"
           class="bg-red-500 text-white px-4 py-1 rounded cursor-pointer text-sm transition-colors hover:bg-red-600">
           Log Out
         </button>
@@ -36,9 +68,10 @@ const handleBudget = () => {
     </div>
   </nav>
   <div class="mt-24">
-    <Login v-if="!store.is_logged_in" />
-    <Budget v-if="store.is_logged_in && !show_resources" />
-    <Resources v-if="store.is_logged_in && show_resources" />
+    <Landing v-if="view === 'landing'" />
+    <Login v-if="view === 'login'" @logged-in="handleLoginSuccess" />
+    <Budget v-if="view === 'app' && !show_resources" />
+    <Resources v-if="view === 'app' && show_resources" />
   </div>
 </template>
 

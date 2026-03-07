@@ -2,6 +2,8 @@
 import { ref, nextTick } from 'vue'
 import { store } from '../store.js'
 
+const emit = defineEmits(['logged-in']);
+
 const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:3001';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 const email = ref(store.get_email());
@@ -80,6 +82,7 @@ const login = async () => {
     });
     if (resp.status === 201 || resp.status === 409) {
       store.log_in_as(email.value, token.value);
+      emit('logged-in');
     } else {
       error.value = "Login failed";
       store.log_out();
