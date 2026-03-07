@@ -14,6 +14,7 @@ export const store = reactive({
     this.token = token;
     localStorage.setItem('email', email);
     localStorage.setItem('token', token);
+    localStorage.setItem('has_ever_logged_in', 'true');
   },
   async log_out() {
     try {
@@ -44,5 +45,8 @@ export const store = reactive({
   },
   get_token() {
     return this.token;
+  },
+  has_ever_logged_in() {
+    return !!localStorage.getItem('has_ever_logged_in');
   }
 });
