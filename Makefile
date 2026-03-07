@@ -23,12 +23,14 @@ run-auth:
 
 .PHONY: run-prod-webapp
 run-prod-webapp:
+	git pull
 	npm run build --prefix ./budget-web-app
 	sudo cp -r ./budget-web-app/dist/ /var/www/
 	sudo systemctl restart nginx
 
 .PHONY: build-prod-binaries
 build-prod-binaries:
+	git pull
 	cargo build --release --bin auth-svc
 	sudo systemctl restart bauth.service
 	cargo build --release --bin budget-rest
