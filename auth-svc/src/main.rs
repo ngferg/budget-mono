@@ -2,6 +2,7 @@ use axum::extract::{Json, State};
 use axum::routing;
 use rand::Rng;
 use rand::distributions::{Alphanumeric, DistString};
+use std::collections::HashSet;
 use tower_http::cors::CorsLayer;
 mod types;
 
@@ -23,7 +24,7 @@ struct AppState {
     >,
     token_map: std::sync::Arc<
         tokio::sync::RwLock<
-            std::collections::HashMap<String, (String, chrono::DateTime<chrono::Utc>)>,
+            std::collections::HashMap<String, (HashSet<String>, chrono::DateTime<chrono::Utc>)>,
         >,
     >,
 }
@@ -184,7 +185,17 @@ async fn verify_code(
                 let res = types::VerifyCodeResponse { token };
                 {
                     let mut token_map = state.token_map.write().await;
-                    token_map.insert(hashed_email, (res.token.clone(), chrono::Utc::now()));
+                    token_map
+                        .entry(hashed_email)
+                        .and_modify(|v| {
+                            v.0.insert(res.token.clone());
+                            v.1 = chrono::Utc::now();
+                        })
+                        .or_insert_with(|| {
+                            let mut set = HashSet::new();
+                            set.insert(res.token.clone());
+                            (set, chrono::Utc::now())
+                        });
                 }
                 return (
                     axum::http::StatusCode::OK,
@@ -212,7 +223,7 @@ async fn verify_token(
     let stored_token = token_map.get(&sha256::digest(req.email.clone()));
     match stored_token {
         Some(t) => {
-            if t.0 == req.token {
+            if t.0.contains(&req.token) {
                 drop(token_map);
                 state
                     .token_map
@@ -238,13 +249,14 @@ async fn logout(
     let stored_token = token_map.get(&sha256::digest(req.email.clone()));
     match stored_token {
         Some(t) => {
-            if t.0 == req.token {
+            if t.0.contains(&req.token) {
                 drop(token_map);
-                state
-                    .token_map
-                    .write()
-                    .await
-                    .remove(&sha256::digest(req.email.clone()));
+                let key = sha256::digest(req.email.clone());
+                let mut token_map = state.token_map.write().await;
+                if let Some(entry) = token_map.get_mut(&key) {
+                    entry.0.remove(&req.token);
+                }
+                token_map.retain(|_, v| !v.0.is_empty());
                 axum::http::StatusCode::OK
             } else {
                 axum::http::StatusCode::UNAUTHORIZED
