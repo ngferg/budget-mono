@@ -173,14 +173,14 @@ async fn verify_code(
     State(state): State<AppState>,
     Json(req): Json<types::VerifyCodeRequest>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
-    let code_map = state.code_map.read().await;
     let hashed_email = sha256::digest(req.email.clone());
-    let code = code_map.get(&hashed_email);
-    match code {
-        Some(stored_code) => {
-            if *stored_code.0 == req.code {
-                drop(code_map);
-                state.code_map.write().await.remove(&hashed_email);
+    let code_entry = {
+        let mut code_map = state.code_map.write().await;
+        code_map.remove(&hashed_email)
+    };
+    match code_entry {
+        Some((code, _)) => {
+            if code == req.code {
                 let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 64);
                 let res = types::VerifyCodeResponse { token };
                 {
@@ -197,18 +197,18 @@ async fn verify_code(
                             (set, chrono::Utc::now())
                         });
                 }
-                return (
+                (
                     axum::http::StatusCode::OK,
                     axum::Json(serde_json::to_value(res).unwrap_or_default()),
-                );
+                )
             } else {
-                return (
+                (
                     axum::http::StatusCode::UNAUTHORIZED,
                     axum::Json(serde_json::from_str("{}").unwrap_or_default()),
-                );
+                )
             }
         }
-        _ => (
+        None => (
             axum::http::StatusCode::UNAUTHORIZED,
             axum::Json(serde_json::from_str("{}").unwrap_or_default()),
         ),
