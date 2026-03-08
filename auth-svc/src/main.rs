@@ -219,24 +219,17 @@ async fn verify_token(
     State(state): State<AppState>,
     Json(req): Json<types::VerifyTokenRequest>,
 ) -> axum::http::StatusCode {
-    let token_map = state.token_map.read().await;
-    let stored_token = token_map.get(&sha256::digest(req.email.clone()));
-    match stored_token {
-        Some(t) => {
-            if t.0.contains(&req.token) {
-                drop(token_map);
-                state
-                    .token_map
-                    .write()
-                    .await
-                    .entry(sha256::digest(req.email.clone()))
-                    .and_modify(|v| v.1 = chrono::Utc::now());
+    let mut token_map = state.token_map.write().await;
+    match token_map.entry(sha256::digest(req.email.clone())) {
+        std::collections::hash_map::Entry::Occupied(mut entry) => {
+            if entry.get().0.contains(&req.token) {
+                entry.get_mut().1 = chrono::Utc::now();
                 axum::http::StatusCode::OK
             } else {
                 axum::http::StatusCode::UNAUTHORIZED
             }
         }
-        _ => axum::http::StatusCode::UNAUTHORIZED,
+        std::collections::hash_map::Entry::Vacant(_) => axum::http::StatusCode::UNAUTHORIZED,
     }
 }
 
