@@ -52,6 +52,7 @@ const get_budget = async () => {
       error.value = "Error: " + resp.status;
       if (resp.status === 401) {
         store.log_out();
+        window.location.reload();
       }
     }
   } catch (e) {
@@ -267,7 +268,7 @@ const add_category = async () => {
 
   <div v-if="budget !== null" class="card">
     <h2 class="justify-center"><button @click="last_month" v-if="show_back_button">&lt;</button>Budget for {{ month
-    }}/{{ year
+      }}/{{ year
       }}<button @click="next_month" v-if="show_forward_button">&gt;</button></h2>
     <div v-if="last_month_clonable">
       <button @click="clone_last_month">Clone Last Month's Budget</button>
