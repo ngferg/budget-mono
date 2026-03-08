@@ -86,10 +86,12 @@ const login = async () => {
     } else {
       error.value = "Login failed";
       store.log_out();
+      window.location.reload();
     }
   } catch (e) {
     error.value = "Error: " + e.message;
     store.log_out();
+    window.location.reload();
   }
 };
 </script>
