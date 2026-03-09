@@ -1,13 +1,11 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite';
-import adsense from 'vite-plugin-adsense';
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
-  const isProduction = mode === 'production';
+export default defineConfig(() => {
   return {
-    plugins: [vue(), tailwindcss(), isProduction && adsense()].filter(Boolean),
+    plugins: [vue(), tailwindcss()],
     server: {
       proxy: {
         '/api': {
