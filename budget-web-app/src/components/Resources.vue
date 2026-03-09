@@ -23,7 +23,7 @@ const deleteAccount = async () => {
                 'Content-Type': 'application/json',
                 'Authorization': store.get_token(),
             },
-            body: JSON.stringify({ hashed_email: await sha256(store.get_email()) }),
+            body: JSON.stringify({ hashed_email: store.get_hashed_email() }),
         });
         if (resp.status === 204) {
             await store.log_out();

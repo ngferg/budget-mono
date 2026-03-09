@@ -3,12 +3,13 @@ import { sha256 } from './hash';
 
 const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:3001';
 const storedEmail = localStorage.getItem('email') || '';
-const hashedEmail = localStorage.getItem('hashed_email') || '';
+const storedHashedEmail = localStorage.getItem('hashed_email') || '';
 const storedToken = localStorage.getItem('token') || '';
 
 export const store = reactive({
   is_logged_in: !!(storedEmail && storedToken),
   email: storedEmail,
+  hashedEmail: storedHashedEmail,
   token: storedToken,
   async log_in_as(email, token) {
     this.is_logged_in = true;
