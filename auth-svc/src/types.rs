@@ -5,7 +5,7 @@ pub(crate) struct RequestCodeRequest {
 
 #[derive(Debug, serde::Deserialize)]
 pub(crate) struct VerifyCodeRequest {
-    pub email: String,
+    pub hashed_email: String,
     pub code: String,
 }
 
@@ -16,6 +16,6 @@ pub(crate) struct VerifyCodeResponse {
 
 #[derive(Debug, serde::Deserialize)]
 pub(crate) struct VerifyTokenRequest {
-    pub email: String,
+    pub hashed_email: String,
     pub token: String,
 }

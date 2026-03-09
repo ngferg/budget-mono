@@ -44,7 +44,7 @@ async fn find_budget(
     headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::GetBudgetRequest>,
 ) -> (http::StatusCode, axum::Json<serde_json::Value>) {
-    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+    if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
         return (
             e,
             axum::Json(serde_json::from_str("{}").unwrap_or_default()),
@@ -84,16 +84,13 @@ async fn create_user(
     headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::CreateUserRequest>,
 ) -> http::StatusCode {
-    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+    if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
         return e;
     }
     let res = budget_lib::create_user(req).await;
     match res {
         Ok(()) => http::StatusCode::CREATED,
         Err(e) => match e {
-            budget_lib::types::CreateUserError::EmailImproperlyFormatted() => {
-                http::StatusCode::UNPROCESSABLE_ENTITY
-            }
             budget_lib::types::CreateUserError::UserAlreadyExists() => http::StatusCode::CONFLICT,
             budget_lib::types::CreateUserError::Internal(_) => {
                 http::StatusCode::INTERNAL_SERVER_ERROR
@@ -106,7 +103,7 @@ async fn delete_user(
     headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::DeleteUserRequest>,
 ) -> http::StatusCode {
-    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+    if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
         return e;
     }
     let res = budget_lib::delete_user(req).await;
@@ -120,7 +117,7 @@ async fn delete_line_item(
     headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::DeleteLineItemRequest>,
 ) -> http::StatusCode {
-    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+    if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
         return e;
     }
     let res = budget_lib::delete_line_item(req).await;
@@ -144,7 +141,7 @@ async fn add_line_item(
     headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::AddLineItemRequest>,
 ) -> http::StatusCode {
-    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+    if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
         return e;
     }
     let res = budget_lib::add_line_item(req).await;
@@ -163,7 +160,7 @@ async fn edit_line_item(
     headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::EditLineItemRequest>,
 ) -> http::StatusCode {
-    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+    if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
         return e;
     }
     let res = budget_lib::edit_line_item(req).await;
@@ -185,7 +182,7 @@ async fn add_category(
     headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::AddCategoryRequest>,
 ) -> http::StatusCode {
-    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+    if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
         return e;
     }
     let res = budget_lib::add_category(req).await;
@@ -204,7 +201,7 @@ async fn clone_month(
     headers: axum::http::HeaderMap,
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::CloneMonthRequest>,
 ) -> http::StatusCode {
-    if let Err(e) = verify_auth(headers, &req.email.as_str()).await {
+    if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
         return e;
     }
     let res = budget_lib::clone_last_month(req).await;
@@ -222,7 +219,10 @@ async fn clone_month(
     }
 }
 
-async fn verify_auth(headers: axum::http::HeaderMap, email: &str) -> Result<(), http::StatusCode> {
+async fn verify_auth(
+    headers: axum::http::HeaderMap,
+    hashed_email: &str,
+) -> Result<(), http::StatusCode> {
     let auth = headers.get("Authorization");
     match auth {
         None => {
@@ -230,7 +230,7 @@ async fn verify_auth(headers: axum::http::HeaderMap, email: &str) -> Result<(), 
         }
         Some(token) => {
             let token_str = token.to_str().unwrap_or("");
-            let res = budget_lib::check_token(email, token_str).await;
+            let res = budget_lib::check_token(hashed_email, token_str).await;
             match res {
                 Err(_) => {
                     return Err(http::StatusCode::UNAUTHORIZED);

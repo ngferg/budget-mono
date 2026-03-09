@@ -173,10 +173,9 @@ async fn verify_code(
     State(state): State<AppState>,
     Json(req): Json<types::VerifyCodeRequest>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
-    let hashed_email = sha256::digest(req.email.clone());
     let code_entry = {
         let mut code_map = state.code_map.write().await;
-        code_map.remove(&hashed_email)
+        code_map.remove(&req.hashed_email)
     };
     match code_entry {
         Some((code, _)) => {
@@ -186,7 +185,7 @@ async fn verify_code(
                 {
                     let mut token_map = state.token_map.write().await;
                     token_map
-                        .entry(hashed_email)
+                        .entry(req.hashed_email)
                         .and_modify(|v| {
                             v.0.insert(res.token.clone());
                             v.1 = chrono::Utc::now();
@@ -220,7 +219,7 @@ async fn verify_token(
     Json(req): Json<types::VerifyTokenRequest>,
 ) -> axum::http::StatusCode {
     let mut token_map = state.token_map.write().await;
-    match token_map.entry(sha256::digest(req.email.clone())) {
+    match token_map.entry(req.hashed_email.clone()) {
         std::collections::hash_map::Entry::Occupied(mut entry) => {
             if entry.get().0.contains(&req.token) {
                 entry.get_mut().1 = chrono::Utc::now();
@@ -239,14 +238,13 @@ async fn logout(
 ) -> axum::http::StatusCode {
     println!("Logout request {req:?}");
     let token_map = state.token_map.read().await;
-    let stored_token = token_map.get(&sha256::digest(req.email.clone()));
+    let stored_token = token_map.get(&req.hashed_email);
     match stored_token {
         Some(t) => {
             if t.0.contains(&req.token) {
                 drop(token_map);
-                let key = sha256::digest(req.email.clone());
                 let mut token_map = state.token_map.write().await;
-                if let Some(entry) = token_map.get_mut(&key) {
+                if let Some(entry) = token_map.get_mut(&req.hashed_email) {
                     entry.0.remove(&req.token);
                 }
                 token_map.retain(|_, v| !v.0.is_empty());

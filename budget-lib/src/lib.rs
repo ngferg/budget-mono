@@ -93,12 +93,12 @@ pub async fn clone_last_month(req: types::CloneMonthRequest) -> Result<(), types
     Ok(())
 }
 
-pub async fn check_token(email: &str, token: &str) -> Result<(), String> {
+pub async fn check_token(hashed_email: &str, token: &str) -> Result<(), String> {
     let client = reqwest::Client::new();
     client
         .post("http://localhost:3001/verify_token")
         .json(&types::VerifyTokenRequest {
-            email: email.to_string(),
+            hashed_email: hashed_email.to_string(),
             token: token.to_string(),
         })
         .send()

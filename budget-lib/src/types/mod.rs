@@ -5,8 +5,6 @@ use chrono::Datelike;
 
 #[derive(thiserror::Error, Debug)]
 pub enum CreateUserError {
-    #[error("Email improperly formatted")]
-    EmailImproperlyFormatted(),
     #[error("User already exists")]
     UserAlreadyExists(),
     #[error("Internal Error: {0}")]
@@ -81,25 +79,25 @@ pub enum CloneMonthError {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct CreateUserRequest {
-    pub email: String,
+    pub hashed_email: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct DeleteUserRequest {
-    pub email: String,
+    pub hashed_email: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct DeleteLineItemRequest {
     pub item_id: u64,
-    pub email: String,
+    pub hashed_email: String,
     pub year: u32,
     pub month: u32,
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct AddLineItemRequest {
-    pub email: String,
+    pub hashed_email: String,
     pub year: u32,
     pub month: u32,
     pub category_id: u64,
@@ -109,7 +107,7 @@ pub struct AddLineItemRequest {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct EditLineItemRequest {
-    pub email: String,
+    pub hashed_email: String,
     pub item_id: u64,
     pub description: String,
     pub amount: u64,
@@ -117,7 +115,7 @@ pub struct EditLineItemRequest {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct GetBudgetRequest {
-    pub email: String,
+    pub hashed_email: String,
     pub year: u32,
     pub month: Month,
 }
@@ -134,14 +132,14 @@ impl GetBudgetRequest {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct AddCategoryRequest {
-    pub email: String,
+    pub hashed_email: String,
     pub category: String,
     pub is_expense: bool,
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct CloneMonthRequest {
-    pub email: String,
+    pub hashed_email: String,
     pub source_year: u32,
     pub source_month: Month,
     pub target_year: u32,
@@ -157,7 +155,7 @@ pub struct GetBudgetResponse {
 
 #[derive(Debug, serde::Serialize)]
 pub(crate) struct VerifyTokenRequest {
-    pub email: String,
+    pub hashed_email: String,
     pub token: String,
 }
 

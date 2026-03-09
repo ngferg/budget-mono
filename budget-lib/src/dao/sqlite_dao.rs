@@ -7,11 +7,7 @@ pub(crate) struct SqliteDao {
 
 impl Dao for SqliteDao {
     fn create_user(&self, req: &types::CreateUserRequest) -> Result<(), types::CreateUserError> {
-        if !req.email.contains("@") {
-            return Err(types::CreateUserError::EmailImproperlyFormatted());
-        }
-        let email_sha = sha256::digest(req.email.clone());
-        let sqlite_file_path = format!("{}/{}.db", self.db_folder, email_sha);
+        let sqlite_file_path = format!("{}/{}.db", self.db_folder, req.hashed_email);
         let sqlite_file = std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -40,7 +36,7 @@ impl Dao for SqliteDao {
         req: &types::AddLineItemRequest,
     ) -> Result<(), types::AddLineItemError> {
         let conn = self
-            .get_conn(req.email.clone())
+            .get_conn(req.hashed_email.clone())
             .map_err(|_| types::AddLineItemError::UserDoesntExists())?;
         let mut insert_stmt = conn
             .prepare("INSERT INTO line_items (description, amount, category, budget_year, budget_month) VALUES (?, ?, ?, ?, ?)")
@@ -66,7 +62,7 @@ impl Dao for SqliteDao {
         req: &types::EditLineItemRequest,
     ) -> Result<(), types::EditLineItemError> {
         let conn = self
-            .get_conn(req.email.clone())
+            .get_conn(req.hashed_email.clone())
             .map_err(|_| types::EditLineItemError::UserDoesntExists())?;
         let mut update_stmt = conn
             .prepare("UPDATE line_items SET description = ?, amount = ? WHERE id = ?")
@@ -82,8 +78,7 @@ impl Dao for SqliteDao {
     }
 
     fn delete_user(&self, req: &types::DeleteUserRequest) -> Result<(), types::DeleteUserError> {
-        let email_sha = sha256::digest(req.email.clone());
-        let sqlite_file_path = format!("{}/{}.db", self.db_folder, email_sha);
+        let sqlite_file_path = format!("{}/{}.db", self.db_folder, req.hashed_email);
         let res = std::fs::remove_file(sqlite_file_path);
         match res {
             Ok(_) => Ok(()),
@@ -98,7 +93,7 @@ impl Dao for SqliteDao {
         req: &types::DeleteLineItemRequest,
     ) -> Result<(), types::DeleteLineItemError> {
         let conn = self
-            .get_conn(req.email.clone())
+            .get_conn(req.hashed_email.clone())
             .map_err(|_| types::DeleteLineItemError::UserDoesntExists())?;
         let mut delete_stmt = conn
             .prepare("DELETE FROM line_items WHERE budget_year = ? AND budget_month = ? and id = ?")
@@ -121,7 +116,7 @@ impl Dao for SqliteDao {
         req: &types::GetBudgetRequest,
     ) -> Result<types::GetBudgetResponse, types::GetBudgetError> {
         let conn = self
-            .get_conn(req.email.clone())
+            .get_conn(req.hashed_email.clone())
             .map_err(|_| types::GetBudgetError::UserDoesntExists())?;
         let mut category_stmt = conn.prepare("SELECT * FROM categories").map_err(|_| {
             types::GetBudgetError::Internal("Failed to select categories".to_string())
@@ -209,7 +204,7 @@ impl Dao for SqliteDao {
 
     fn add_category(&self, req: &types::AddCategoryRequest) -> Result<(), types::AddCategoryError> {
         let conn = self
-            .get_conn(req.email.clone())
+            .get_conn(req.hashed_email.clone())
             .map_err(|_| types::AddCategoryError::UserDoesntExists())?;
         let mut insert_stmt = conn
             .prepare("INSERT INTO categories (category, is_expense) VALUES (?, ?)")
@@ -226,7 +221,7 @@ impl Dao for SqliteDao {
 
     fn clone_month(&self, req: &types::CloneMonthRequest) -> Result<(), types::CloneMonthError> {
         let conn = self
-            .get_conn(req.email.clone())
+            .get_conn(req.hashed_email.clone())
             .map_err(|_| types::CloneMonthError::UserDoesntExists())?;
 
         let mut select_stmt = conn
@@ -291,9 +286,8 @@ impl SqliteDao {
         Ok(SqliteDao { db_folder })
     }
 
-    fn get_conn(&self, email: String) -> Result<rusqlite::Connection, DaoError> {
-        let email_sha = sha256::digest(email.clone());
-        let sqlite_file_path = format!("{}/{}.db", self.db_folder, email_sha);
+    fn get_conn(&self, hashed_email: String) -> Result<rusqlite::Connection, DaoError> {
+        let sqlite_file_path = format!("{}/{}.db", self.db_folder, hashed_email);
         if !std::path::Path::new(&sqlite_file_path).exists() {
             return Err(DaoError::DbDoesntExist());
         }

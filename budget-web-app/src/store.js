@@ -1,18 +1,22 @@
 import { reactive } from 'vue';
+import { sha256 } from './hash';
 
 const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:3001';
 const storedEmail = localStorage.getItem('email') || '';
+const hashedEmail = localStorage.getItem('hashed_email') || '';
 const storedToken = localStorage.getItem('token') || '';
 
 export const store = reactive({
   is_logged_in: !!(storedEmail && storedToken),
   email: storedEmail,
   token: storedToken,
-  log_in_as(email, token) {
+  async log_in_as(email, token) {
     this.is_logged_in = true;
     this.email = email;
+    this.hashedEmail = await sha256(email);
     this.token = token;
     localStorage.setItem('email', email);
+    localStorage.setItem('hashed_email', this.hashedEmail);
     localStorage.setItem('token', token);
     localStorage.setItem('has_ever_logged_in', 'true');
   },
@@ -24,7 +28,7 @@ export const store = reactive({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          'email': this.email,
+          'email': this.hashedEmail,
           'token': this.token,
         })
       });
@@ -36,12 +40,17 @@ export const store = reactive({
     }
     this.is_logged_in = false;
     this.email = '';
+    this.hashedEmail = '';
     this.token = '';
     localStorage.removeItem('email');
+    localStorage.removeItem('hashed_email');
     localStorage.removeItem('token');
   },
   get_email() {
     return this.email;
+  },
+  get_hashed_email() {
+    return this.hashedEmail;
   },
   get_token() {
     return this.token;

@@ -36,7 +36,7 @@ const get_budget = async () => {
         'Authorization': store.get_token(),
       },
       body: JSON.stringify({
-        'email': store.get_email(),
+        'hashed_email': store.get_hashed_email(),
         'year': year.value,
         'month': month.value,
       })
@@ -78,7 +78,7 @@ const delete_line_item = async (item_id) => {
         'Authorization': store.get_token(),
       },
       body: JSON.stringify({
-        'email': store.get_email(),
+        'hashed_email': store.get_hashed_email(),
         'year': year.value,
         'month': month.value,
         'item_id': item_id,
@@ -111,7 +111,7 @@ const new_line_item = async (category_id) => {
         'Authorization': store.get_token(),
       },
       body: JSON.stringify({
-        'email': store.get_email(),
+        'hashed_email': store.get_hashed_email(),
         'year': year.value,
         'month': month.value,
         'category_id': category_id,
@@ -162,7 +162,7 @@ const save_edit_line_item = async () => {
         'Authorization': store.get_token(),
       },
       body: JSON.stringify({
-        'email': store.get_email(),
+        'hashed_email': store.get_hashed_email(),
         'item_id': edit_item_id.value,
         'description': edit_item_description.value,
         'amount': edit_item_amount.value * 100,
@@ -194,7 +194,7 @@ const clone_last_month = async () => {
         'Authorization': store.get_token(),
       },
       body: JSON.stringify({
-        'email': store.get_email(),
+        'hashed_email': store.get_hashed_email(),
         'source_year': source_year,
         'source_month': source_month,
         'target_year': year.value,
@@ -244,7 +244,7 @@ const add_category = async () => {
         'Authorization': store.get_token(),
       },
       body: JSON.stringify({
-        'email': store.get_email(),
+        'hashed_email': store.get_hashed_email(),
         'category': new_category_name.value,
         'is_expense': true,
       })
@@ -268,7 +268,7 @@ const add_category = async () => {
 
   <div v-if="budget !== null" class="card">
     <h2 class="justify-center"><button @click="last_month" v-if="show_back_button">&lt;</button>Budget for {{ month
-      }}/{{ year
+    }}/{{ year
       }}<button @click="next_month" v-if="show_forward_button">&gt;</button></h2>
     <div v-if="last_month_clonable">
       <button @click="clone_last_month">Clone Last Month's Budget</button>

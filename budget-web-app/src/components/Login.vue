@@ -1,6 +1,7 @@
 <script setup>
 import { ref, nextTick } from 'vue'
 import { store } from '../store.js'
+import { sha256 } from '../hash.js'
 
 const emit = defineEmits(['logged-in']);
 
@@ -48,7 +49,7 @@ const verify_code = async () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        'email': email.value,
+        'hashed_email': await sha256(email.value),
         'code': code.value,
       })
     });
@@ -77,11 +78,11 @@ const login = async () => {
         'Authorization': token.value,
       },
       body: JSON.stringify({
-        'email': email.value,
+        'hashed_email': await sha256(email.value),
       })
     });
     if (resp.status === 201 || resp.status === 409) {
-      store.log_in_as(email.value, token.value);
+      await store.log_in_as(email.value, token.value);
       emit('logged-in');
     } else {
       error.value = "Login failed";

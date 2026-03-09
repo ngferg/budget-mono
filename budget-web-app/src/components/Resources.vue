@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { store } from '../store.js'
+import { sha256 } from '../hash.js'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -22,7 +23,7 @@ const deleteAccount = async () => {
                 'Content-Type': 'application/json',
                 'Authorization': store.get_token(),
             },
-            body: JSON.stringify({ email: store.get_email() }),
+            body: JSON.stringify({ hashed_email: await sha256(store.get_email()) }),
         });
         if (resp.status === 204) {
             await store.log_out();
