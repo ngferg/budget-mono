@@ -18,6 +18,7 @@ const edit_item_amount = ref("");
 const edit_description_input = ref(null);
 const last_month_clonable = ref(false);
 const new_category_name = ref('');
+const descInputs = {};
 const show_back_button = computed(() => {
   return year.value > 2026 || (year.value === 2026 && month.value > 1);
 });
@@ -123,6 +124,9 @@ const new_line_item = async (category_id) => {
       item_descriptions.value[category_id] = '';
       item_amounts.value[category_id] = '';
       await get_budget();
+      nextTick(() => {
+        descInputs[category_id]?.focus();
+      });
     } else {
       error.value = "Error: " + resp.status;
     }
@@ -291,10 +295,15 @@ const add_category = async () => {
               @click="delete_line_item(item.id)">-</button><button
               @click="open_edit_line_item_modal(item.id, item.description, item.amount)">✎</button>
           </li>
-          <li><input type="text" placeholder="Add new line item" v-model="item_descriptions[category.id]"></input>:
-            <input type="number" placeholder="Amount" v-model.number="item_amounts[category.id]"
-              @keydown.enter="new_line_item(category.id)"></input><button
-              @click=" new_line_item(category.id)">+</button>
+          <li>
+            <input type="text" placeholder="Add new line item" v-model="item_descriptions[category.id]"
+              :ref="(el) => { if (el) descInputs[category.id] = el }" />
+            <span class="colon-separator">:</span>
+            <div class="amount-add-row">
+              <input type="number" placeholder="Amount" v-model.number="item_amounts[category.id]"
+                @keydown.enter="new_line_item(category.id)" />
+              <button @click="new_line_item(category.id)">+</button>
+            </div>
           </li>
 
         </ul>
@@ -541,5 +550,36 @@ input::placeholder {
 
 .add-category-row input[type="text"] {
   flex: 1;
+}
+
+.amount-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 780px) {
+  li:last-child {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .colon-separator {
+    display: none;
+  }
+
+  li:last-child input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .amount-add-row {
+    width: 100%;
+  }
+
+  .amount-add-row input {
+    flex: 1;
+  }
 }
 </style>
