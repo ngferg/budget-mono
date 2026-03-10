@@ -19,3 +19,14 @@ pub(crate) struct VerifyTokenRequest {
     pub hashed_email: String,
     pub token: String,
 }
+
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct LoginCountRequest {
+    pub hashed_email: String,
+    pub token: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub(crate) struct LoginCountResponse {
+    pub count: usize,
+}

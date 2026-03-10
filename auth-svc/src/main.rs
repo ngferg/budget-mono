@@ -96,6 +96,7 @@ async fn main() {
         .route("/request_code", routing::post(request_code))
         .route("/verify_code", routing::post(verify_code))
         .route("/verify_token", routing::post(verify_token))
+        .route("/login_count", routing::post(login_count))
         .route("/logout", routing::post(logout))
         .layer(cors)
         .with_state(state);
@@ -254,5 +255,39 @@ async fn logout(
             }
         }
         _ => axum::http::StatusCode::UNAUTHORIZED,
+    }
+}
+
+async fn login_count(
+    State(state): State<AppState>,
+    Json(req): Json<types::LoginCountRequest>,
+) -> (
+    axum::http::StatusCode,
+    axum::Json<types::LoginCountResponse>,
+) {
+    let stored_tokens = {
+        let token_map = state.token_map.read().await;
+        token_map.get(&req.hashed_email).map(|v| v.0.clone())
+    };
+    match stored_tokens {
+        Some(tokens) => {
+            if tokens.contains(&req.token) {
+                (
+                    axum::http::StatusCode::OK,
+                    axum::Json(types::LoginCountResponse {
+                        count: tokens.len(),
+                    }),
+                )
+            } else {
+                (
+                    axum::http::StatusCode::UNAUTHORIZED,
+                    axum::Json(types::LoginCountResponse { count: 0 }),
+                )
+            }
+        }
+        None => (
+            axum::http::StatusCode::UNAUTHORIZED,
+            axum::Json(types::LoginCountResponse { count: 0 }),
+        ),
     }
 }

@@ -1,13 +1,42 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { store } from '../store.js'
 import { sha256 } from '../hash.js'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:3001';
 
 const deleteError = ref('');
 const deleteConfirm = ref(false);
 const deleting = ref(false);
+
+const loginCount = ref(null);
+const loginCountError = ref('');
+
+const fetchLoginCount = async () => {
+    console.log("Fetching login count for: " + store.get_email());
+    loginCountError.value = '';
+    try {
+        const resp = await fetch(AUTH_BASE_URL + '/login_count', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                hashed_email: store.get_hashed_email(),
+                token: store.get_token(),
+            }),
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            loginCount.value = data.count;
+        } else {
+            loginCountError.value = `Could not retrieve session count (status ${resp.status}).`;
+        }
+    } catch (e) {
+        loginCountError.value = 'Error fetching session count: ' + e.message;
+    }
+};
+
+onMounted(fetchLoginCount);
 
 const deleteAccount = async () => {
     if (!deleteConfirm.value) {
@@ -85,6 +114,18 @@ const cancelDelete = () => {
         <h3 class="text-2xl font-bold text-emerald-300 mt-6 mb-4 border-b-2 border-emerald-500 pb-2">Account
             Management:
         </h3>
+        <div class="account-management-section sessions-section">
+            <h4 class="section-title sessions-title">Active Sessions</h4>
+            <p class="section-desc">
+                You are currently logged in on
+                <span v-if="loginCount !== null" class="session-count">{{ loginCount }} {{ loginCount === 1 ? 'device' :
+                    'devices' }}</span>
+                <span v-else-if="loginCountError" class="session-count-error">unknown</span>
+                <span v-else class="session-count-loading">...</span>.
+            </p>
+            <p v-if="loginCountError" class="session-error">{{ loginCountError }}</p>
+        </div>
+
         <div class="account-management-section">
             <h4 class="section-title">Delete Your Account</h4>
             <p class="section-desc">Permanently delete your account and all associated budget data. This action cannot
@@ -244,6 +285,37 @@ li:hover .link-title {
     color: #fca5a5;
     font-size: 0.9em;
     margin-bottom: 0.8em;
+    text-align: left;
+}
+
+.sessions-section {
+    background: rgba(16, 185, 129, 0.06);
+    border-color: rgba(16, 185, 129, 0.3);
+    margin-bottom: 0.8em;
+}
+
+.sessions-title {
+    color: #6ee7b7;
+}
+
+.session-count {
+    font-weight: 700;
+    color: #34d399;
+}
+
+.session-count-loading {
+    color: #6ee7b7;
+    font-style: italic;
+}
+
+.session-count-error {
+    color: #fca5a5;
+}
+
+.session-error {
+    color: #fca5a5;
+    font-size: 0.9em;
+    margin-bottom: 0;
     text-align: left;
 }
 </style>
