@@ -4,6 +4,7 @@ members = ["auth-svc","budget-lib", "budget-rest"]
 
 [workspace.dependencies]
 axum = "0.8.6"
+envconfig = "0.10"
 chrono = "0.4.42"
 mail-send = { version = "0.5.2", features = ["ring"] }
 reqwest = { version = "0.13.1", features = ["json"] }

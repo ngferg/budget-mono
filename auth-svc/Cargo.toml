@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 axum.workspace = true
+envconfig.workspace = true
 chrono.workspace = true
 mail-send = { workspace = true, features = ["ring"] }
 rand.workspace= true

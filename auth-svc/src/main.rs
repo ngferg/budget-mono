@@ -1,14 +1,18 @@
 use axum::extract::{Json, State};
 use axum::routing;
+use envconfig::Envconfig;
 use rand::Rng;
 use rand::distributions::{Alphanumeric, DistString};
 use std::collections::HashSet;
 use tower_http::cors::CorsLayer;
 mod types;
 
-static FROM_ADDR: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-static SMTP_PASSWORD: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-static SMTP_HOST: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+#[derive(Envconfig)]
+struct Config {
+    smtp_user: String,
+    smtp_pass: String,
+    smtp_host: String,
+}
 
 const CODE_EXPIRATION_MINUTES: i64 = 10;
 const CODE_CLEANUP_INTERVAL_SECONDS: u64 = 60;
@@ -17,6 +21,7 @@ const TOKEN_CLEANUP_INTERVAL_SECONDS: u64 = 3600;
 
 #[derive(Clone)]
 struct AppState {
+    config: std::sync::Arc<Config>,
     code_map: std::sync::Arc<
         tokio::sync::RwLock<
             std::collections::HashMap<String, (String, chrono::DateTime<chrono::Utc>)>,
@@ -33,16 +38,9 @@ struct AppState {
 async fn main() {
     let _ = rustls::crypto::ring::default_provider().install_default();
 
-    FROM_ADDR
-        .set(std::env::var("SMTP_USER").expect("SMTP_USER env var must be set"))
-        .unwrap();
-    SMTP_PASSWORD
-        .set(std::env::var("SMTP_PASS").expect("SMTP_PASS env var must be set"))
-        .unwrap();
-    SMTP_HOST
-        .set(std::env::var("SMTP_HOST").expect("SMTP_HOST env var must be set"))
-        .unwrap();
+    let config = Config::init_from_env().expect("Failed to load config from environment");
     let state = AppState {
+        config: std::sync::Arc::new(config),
         code_map: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         token_map: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
     };
@@ -137,8 +135,8 @@ async fn request_code(
     }
     // Build a simple multipart message
     let to_addr = req.email.clone();
-    let from_email = FROM_ADDR.get().map(|s| s.as_str()).unwrap_or("");
-    let smtp_pass = SMTP_PASSWORD.get().map(|s| s.as_str()).unwrap_or("");
+    let from_email = state.config.smtp_user.as_str();
+    let smtp_pass = state.config.smtp_pass.as_str();
 
     let message = mail_send::mail_builder::MessageBuilder::new()
         .from(("FeBudget", from_email))
@@ -149,12 +147,11 @@ async fn request_code(
 
     // Connect to the SMTP submissions port, upgrade to TLS and
     // authenticate using the provided credentials.
-    let smtp_client =
-        mail_send::SmtpClientBuilder::new(SMTP_HOST.get().map(|s| s.as_str()).unwrap_or(""), 587)
-            .implicit_tls(false)
-            .credentials((from_email, smtp_pass))
-            .connect()
-            .await;
+    let smtp_client = mail_send::SmtpClientBuilder::new(state.config.smtp_host.as_str(), 587)
+        .implicit_tls(false)
+        .credentials((from_email, smtp_pass))
+        .connect()
+        .await;
     match smtp_client {
         Ok(mut smtp_client) => {
             let res = smtp_client
