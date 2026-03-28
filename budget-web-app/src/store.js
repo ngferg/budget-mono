@@ -21,7 +21,7 @@ export const store = reactive({
     localStorage.setItem('token', token);
     localStorage.setItem('has_ever_logged_in', 'true');
   },
-  async log_out() {
+  async log_out(logout_all = false) {
     try {
       const resp = await fetch(AUTH_BASE_URL + '/logout', {
         method: 'POST',
@@ -29,8 +29,9 @@ export const store = reactive({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          'email': this.hashedEmail,
+          'hashed_email': this.hashedEmail,
           'token': this.token,
+          'logout_all': logout_all,
         })
       });
       if (resp.status !== 200) {

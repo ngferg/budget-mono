@@ -21,6 +21,13 @@ pub(crate) struct VerifyTokenRequest {
 }
 
 #[derive(Debug, serde::Deserialize)]
+pub(crate) struct LogoutRequest {
+    pub hashed_email: String,
+    pub token: String,
+    pub logout_all: bool,
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub(crate) struct LoginCountRequest {
     pub hashed_email: String,
     pub token: String,

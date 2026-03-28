@@ -1,7 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { store } from '../store.js'
-import { sha256 } from '../hash.js'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:3001';
@@ -69,10 +68,11 @@ const deleteAccount = async () => {
     }
 };
 
-const cancelDelete = () => {
-    deleteConfirm.value = false;
-    deleteError.value = '';
-};
+const logout_all = async () => {
+    await store.log_out(true);
+    window.location.reload();
+}
+
 </script>
 
 <template>
@@ -124,6 +124,9 @@ const cancelDelete = () => {
                 <span v-else class="session-count-loading">...</span>.
             </p>
             <p v-if="loginCountError" class="session-error">{{ loginCountError }}</p>
+            <button class="delete-btn" @click="logout_all" :disabled="loginCount === null || loginCount === 0">
+                Log Out of All Sessions
+            </button>
         </div>
 
         <div class="account-management-section">

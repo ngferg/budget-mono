@@ -232,18 +232,23 @@ async fn verify_token(
 
 async fn logout(
     State(state): State<AppState>,
-    Json(req): Json<types::VerifyTokenRequest>,
+    Json(req): Json<types::LogoutRequest>,
 ) -> axum::http::StatusCode {
     println!("Logout request {req:?}");
-    let token_map = state.token_map.read().await;
-    let stored_token = token_map.get(&req.hashed_email);
+    let stored_token = {
+        let token_map = state.token_map.read().await;
+        token_map.get(&req.hashed_email).cloned()
+    };
     match stored_token {
         Some(t) => {
             if t.0.contains(&req.token) {
-                drop(token_map);
                 let mut token_map = state.token_map.write().await;
                 if let Some(entry) = token_map.get_mut(&req.hashed_email) {
-                    entry.0.remove(&req.token);
+                    if req.logout_all {
+                        entry.0.clear();
+                    } else {
+                        entry.0.remove(&req.token);
+                    }
                 }
                 token_map.retain(|_, v| !v.0.is_empty());
                 axum::http::StatusCode::OK
