@@ -9,6 +9,7 @@ mod types;
 
 #[derive(Envconfig)]
 struct Config {
+    display_from_email: String,
     smtp_user: String,
     smtp_pass: String,
     smtp_host: String,
@@ -135,10 +136,11 @@ async fn request_code(
     // Build a simple multipart message
     let to_addr = req.email.clone();
     let from_email = state.config.smtp_user.as_str();
+    let display_from_email = state.config.display_from_email.as_str();
     let smtp_pass = state.config.smtp_pass.as_str();
 
     let message = mail_send::mail_builder::MessageBuilder::new()
-        .from(("FeBudget", from_email))
+        .from(("FeBudget Login", display_from_email))
         .to(to_addr.as_str())
         .subject("Here's your login code")
         .text_body(format!("Your login code is: {code}"))
