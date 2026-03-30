@@ -235,6 +235,43 @@ async function next_month() {
   await get_budget();
 }
 
+const expense_breakdown = computed(() => {
+  if (!categories.value || !budget.value) return [];
+  const expense_cats = categories.value.slice(1);
+  const totals = expense_cats.map(cat => ({
+    name: cat.name,
+    total: (budget.value[cat.id] || []).reduce((sum, item) => sum + item.amount, 0),
+  })).filter(c => c.total > 0);
+  const grand_total = totals.reduce((sum, c) => sum + c.total, 0);
+  if (grand_total === 0) return [];
+  const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#a78bfa'];
+  let cumulative = 0;
+  return totals.map((cat, i) => {
+    const percentage = cat.total / grand_total;
+    const start = cumulative * 2 * Math.PI - Math.PI / 2;
+    cumulative += percentage;
+    const end = (percentage >= 1)
+      ? start + 2 * Math.PI - 0.0001
+      : cumulative * 2 * Math.PI - Math.PI / 2;
+    return { ...cat, percentage, start, end, color: colors[i % colors.length] };
+  });
+});
+
+const donut_paths = computed(() => {
+  const cx = 100, cy = 100, ro = 80, ri = 50;
+  return expense_breakdown.value.map(({ start, end, color }) => {
+    const large = end - start > Math.PI ? 1 : 0;
+    const x1 = cx + ro * Math.cos(start), y1 = cy + ro * Math.sin(start);
+    const x2 = cx + ro * Math.cos(end), y2 = cy + ro * Math.sin(end);
+    const x3 = cx + ri * Math.cos(end), y3 = cy + ri * Math.sin(end);
+    const x4 = cx + ri * Math.cos(start), y4 = cy + ri * Math.sin(start);
+    return {
+      color,
+      d: `M${x1} ${y1} A${ro} ${ro} 0 ${large} 1 ${x2} ${y2} L${x3} ${y3} A${ri} ${ri} 0 ${large} 0 ${x4} ${y4}Z`,
+    };
+  });
+});
+
 const add_category = async () => {
   if (new_category_name.value === '') {
     console.error('Error: Category name is required.');
@@ -285,6 +322,19 @@ const add_category = async () => {
       Expenses: {{formatCents(categories.slice(1).flatMap(cat => budget[cat.id] || []).reduce((sum, item) => sum +
         item.amount, 0))}}
     </h4>
+    <div v-if="expense_breakdown.length > 0" class="chart-container">
+      <svg viewBox="0 0 200 200" class="donut-chart" aria-hidden="true">
+        <path v-for="(path, i) in donut_paths" :key="i" :d="path.d" :fill="path.color" opacity="0.9" />
+      </svg>
+      <ul class="chart-legend">
+        <li v-for="cat in expense_breakdown" :key="cat.name" class="legend-item">
+          <span class="legend-dot" :style="{ backgroundColor: cat.color }"></span>
+          <span class="legend-label">{{ cat.name }}</span>
+          <span class="legend-value">{{ (cat.percentage * 100).toFixed(1) }}%&ensp;({{ formatCents(cat.total) }})</span>
+        </li>
+      </ul>
+    </div>
+
     <h3 class="text-2xl font-bold text-emerald-300 mt-8 mb-4 border-b-2 border-emerald-500 pb-2">Categories:</h3>
     <div>
       <h4 v-for="category in categories" :key="category.id" class="text-xl font-bold text-emerald-100 mt-6 mb-3">
@@ -550,6 +600,80 @@ input::placeholder {
 
 .add-category-row input[type="text"] {
   flex: 1;
+}
+
+.chart-container {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.donut-chart {
+  width: 160px;
+  height: 160px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+.chart-legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 180px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  margin: 0;
+  padding: 0;
+  transform: none;
+  transition: none;
+  font-size: 0.875rem;
+}
+
+.legend-item:hover {
+  background: none;
+  border: none;
+  transform: none;
+}
+
+.legend-item:last-child,
+.legend-item:last-child:hover {
+  background: none;
+  border: none;
+  transform: none;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-label {
+  flex: 1;
+  color: #d1fae5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.legend-value {
+  color: #a7f3d0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .amount-add-row {
