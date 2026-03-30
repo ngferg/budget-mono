@@ -90,8 +90,16 @@ const logout_all = async () => {
                     banking app that
                     offers fee-free checking and savings accounts, along with a variety of financial tools to help you
                     manage your money. The savings account also has competitive interest rates. When you open an account
-                    with this link, and set up a minimum $200 direct deposit,
-                    you will receive a cash bonus.
+                    with this link, get some free money to start your savings! See the Chime website for details on the
+                    current offer.
+                </a>
+            </li>
+            <li>
+                <a href="https://join.robinhood.com/nicholf4293" target="_blank">
+                    <span class="link-title">Robinhood</span>: Robinhood is a user-friendly investment platform that
+                    allows you to trade stocks, ETFs, and cryptocurrencies with no commission fees.
+                    It's a great option for beginners looking to start investing. Get a free stock when you sign up
+                    using this link, details of the offer can be found on the Robinhood website.
                 </a>
             </li>
             <li>
@@ -107,6 +115,7 @@ const logout_all = async () => {
                     target="_blank">
                     <span class="link-title">Reliant Energy</span>: Live in Texas? Sign up for Reliant Energy using this
                     link to receive a bill credit when you sign up for service.
+                    details of the offer can be found on the Reliant Energy website.
                 </a>
             </li>
         </ul>
