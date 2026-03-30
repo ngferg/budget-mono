@@ -108,7 +108,6 @@ async fn main() {
 
 // which calls one of these handlers
 async fn health() -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
-    println!("Performing health check...");
     let healthy = r#"
     {
       "status": "healthy"
@@ -234,7 +233,6 @@ async fn logout(
     State(state): State<AppState>,
     Json(req): Json<types::LogoutRequest>,
 ) -> axum::http::StatusCode {
-    println!("Logout request {req:?}");
     let stored_token = {
         let token_map = state.token_map.read().await;
         token_map.get(&req.hashed_email).cloned()

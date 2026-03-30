@@ -30,7 +30,6 @@ async fn main() {
 
 // which calls one of these handlers
 async fn health() -> (http::StatusCode, axum::Json<serde_json::Value>) {
-    println!("Performing health check...");
     let healthy = r#"
     {
       "status": "healthy"
