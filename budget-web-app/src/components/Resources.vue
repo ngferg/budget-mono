@@ -105,11 +105,11 @@ const logout_all = async () => {
             <li>
                 <a href="https://www.visible.com/get/?69C3CTQ" target="_blank">
                     <span class="link-title">Visible Mobile</span>: Visible Mobile is a wireless carrier that offers
-                    affordable plans with unlimited talk, text, and data on the Verizon network. When you sign up using
-                    this link and enter the code
+                    plans with unlimited talk, text, and data on the Verizon network, for much less than any of the big
+                    networks.
+                    When you sign up using this link and enter the code
                     <pre>69C3CTQ</pre> in the referral field, you can get a bill credit. See the Visible Mobile website
-                    for details on the current
-                    offer.
+                    for details on the current offer.
                 </a>
             </li>
             <li>
