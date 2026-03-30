@@ -28,7 +28,6 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-// which calls one of these handlers
 async fn health() -> (http::StatusCode, axum::Json<serde_json::Value>) {
     let healthy = r#"
     {
