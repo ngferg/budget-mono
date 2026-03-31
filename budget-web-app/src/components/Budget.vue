@@ -272,6 +272,28 @@ const donut_paths = computed(() => {
   });
 });
 
+const income_total = computed(() => {
+  if (!categories.value || !budget.value) return 0;
+  return (budget.value[categories.value[0]?.id] || []).reduce((sum, item) => sum + item.amount, 0);
+});
+
+const expense_total = computed(() => {
+  if (!categories.value || !budget.value) return 0;
+  return categories.value.slice(1).flatMap(cat => budget.value[cat.id] || []).reduce((sum, item) => sum + item.amount, 0);
+});
+
+const income_bar_pct = computed(() => {
+  const max = Math.max(income_total.value, expense_total.value);
+  if (max === 0) return 0;
+  return (income_total.value / max) * 100;
+});
+
+const expense_bar_pct = computed(() => {
+  const max = Math.max(income_total.value, expense_total.value);
+  if (max === 0) return 0;
+  return (expense_total.value / max) * 100;
+});
+
 const add_category = async () => {
   if (new_category_name.value === '') {
     console.error('Error: Category name is required.');
@@ -333,6 +355,28 @@ const add_category = async () => {
           <span class="legend-value">{{ (cat.percentage * 100).toFixed(1) }}%&ensp;({{ formatCents(cat.total) }})</span>
         </li>
       </ul>
+    </div>
+
+    <div v-if="income_total > 0 || expense_total > 0" class="ie-bar-container">
+      <div class="ie-bar-row">
+        <span class="ie-bar-label">Income</span>
+        <div class="ie-bar-track">
+          <div class="ie-bar-fill ie-income" :style="{ width: income_bar_pct + '%' }"></div>
+        </div>
+        <span class="ie-bar-amount">{{ formatCents(income_total) }}</span>
+      </div>
+      <div class="ie-bar-row">
+        <span class="ie-bar-label">Expenses</span>
+        <div class="ie-bar-track">
+          <div class="ie-bar-fill ie-expense" :style="{ width: expense_bar_pct + '%' }"></div>
+        </div>
+        <span class="ie-bar-amount">{{ formatCents(expense_total) }}</span>
+      </div>
+      <div class="ie-bar-summary">
+        <span v-if="income_total >= expense_total" class="ie-surplus">Surplus: {{ formatCents(income_total -
+          expense_total) }}</span>
+        <span v-else class="ie-shortfall">Shortfall: {{ formatCents(expense_total - income_total) }}</span>
+      </div>
     </div>
 
     <h3 class="text-2xl font-bold text-emerald-300 mt-8 mb-4 border-b-2 border-emerald-500 pb-2">Categories:</h3>
@@ -680,6 +724,74 @@ input::placeholder {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.ie-bar-container {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ie-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ie-bar-label {
+  width: 64px;
+  font-size: 0.85rem;
+  color: #a7f3d0;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.ie-bar-track {
+  flex: 1;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.ie-bar-fill {
+  height: 100%;
+  border-radius: 9px;
+  transition: width 0.4s ease;
+}
+
+.ie-income {
+  background: #10b981;
+}
+
+.ie-expense {
+  background: #ef4444;
+}
+
+.ie-bar-amount {
+  width: 80px;
+  font-size: 0.85rem;
+  color: #d1fae5;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.ie-bar-summary {
+  text-align: right;
+  font-size: 1.25rem;
+  font-weight: 600;
+  padding-right: 0;
+  margin-top: 2px;
+}
+
+.ie-surplus {
+  color: #10b981;
+}
+
+.ie-shortfall {
+  color: #ef4444;
 }
 
 @media (max-width: 780px) {
