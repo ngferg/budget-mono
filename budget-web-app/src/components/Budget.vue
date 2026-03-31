@@ -331,19 +331,12 @@ const add_category = async () => {
 
   <div v-if="budget !== null" class="card">
     <h2 class="justify-center"><button @click="last_month" v-if="show_back_button">&lt;</button>Budget for {{ month
-      }}/{{ year
+    }}/{{ year
       }}<button @click="next_month" v-if="show_forward_button">&gt;</button></h2>
     <div v-if="last_month_clonable">
       <button @click="clone_last_month">Clone Last Month's Budget</button>
     </div>
     <h3 class="text-2xl font-bold text-emerald-300 mt-6 mb-4 border-b-2 border-emerald-500 pb-2">Overview:</h3>
-    <h4 class="text-lg font-semibold text-emerald-200 mb-2 pl-4">
-      Income: {{formatCents(budget[categories[0]?.id]?.map(item => item.amount).reduce((a, c) => a + c, 0) || 0)}}
-    </h4>
-    <h4 class="text-lg font-semibold text-emerald-200 mb-2 pl-4">
-      Expenses: {{formatCents(categories.slice(1).flatMap(cat => budget[cat.id] || []).reduce((sum, item) => sum +
-        item.amount, 0))}}
-    </h4>
     <div v-if="expense_breakdown.length > 0" class="chart-container">
       <svg viewBox="0 0 200 200" class="donut-chart" aria-hidden="true">
         <path v-for="(path, i) in donut_paths" :key="i" :d="path.d" :fill="path.color" opacity="0.9" />
