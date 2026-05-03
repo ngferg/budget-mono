@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 mod dao;
 pub mod types;
 
@@ -6,9 +8,10 @@ pub async fn create_user(
 ) -> Result<(), types::CreateUserError> {
     use dao::Dao as dao_trait;
 
-    let dao = dao::sqlite_dao::SqliteDao::try_new().map_err(|e| {
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
         types::CreateUserError::Internal(format!("Failed to create sqlite dao: {e}"))
     })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
     let _ = dao.create_user(&create_user_request)?;
     Ok(())
 }
@@ -18,9 +21,10 @@ pub async fn delete_user(
 ) -> Result<(), types::DeleteUserError> {
     use dao::Dao as dao_trait;
 
-    let dao = dao::sqlite_dao::SqliteDao::try_new().map_err(|e| {
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
         types::DeleteUserError::Internal(format!("Failed to create sqlite dao: {e}"))
     })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
     let _ = dao.delete_user(&del_user_request)?;
     Ok(())
 }
@@ -30,9 +34,10 @@ pub async fn delete_line_item(
 ) -> Result<(), types::DeleteLineItemError> {
     use dao::Dao as dao_trait;
 
-    let dao = dao::sqlite_dao::SqliteDao::try_new().map_err(|e| {
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
         types::DeleteLineItemError::Internal(format!("Failed to create sqlite dao: {e}"))
     })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
     let _ = dao.delete_line_item(&req)?;
     Ok(())
 }
@@ -40,9 +45,10 @@ pub async fn delete_line_item(
 pub async fn add_line_item(req: types::AddLineItemRequest) -> Result<(), types::AddLineItemError> {
     use dao::Dao as dao_trait;
 
-    let dao = dao::sqlite_dao::SqliteDao::try_new().map_err(|e| {
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
         types::AddLineItemError::Internal(format!("Failed to create sqlite dao: {e}"))
     })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
     let _ = dao.add_line_item(&req)?;
     Ok(())
 }
@@ -54,9 +60,10 @@ pub async fn get_budget(
 
     get_budget_request.validate()?;
 
-    let dao = dao::sqlite_dao::SqliteDao::try_new().map_err(|e| {
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
         types::GetBudgetError::Internal(format!("Failed to create sqlite dao: {e}"))
     })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
     let res = dao.get_budget(&get_budget_request)?;
     Ok(res)
 }
@@ -66,9 +73,10 @@ pub async fn edit_line_item(
 ) -> Result<(), types::EditLineItemError> {
     use dao::Dao as dao_trait;
 
-    let dao = dao::sqlite_dao::SqliteDao::try_new().map_err(|e| {
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
         types::EditLineItemError::Internal(format!("Failed to create sqlite dao: {e}"))
     })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
     let _ = dao.edit_line_item(&req)?;
     Ok(())
 }
@@ -76,9 +84,10 @@ pub async fn edit_line_item(
 pub async fn add_category(req: types::AddCategoryRequest) -> Result<(), types::AddCategoryError> {
     use dao::Dao as dao_trait;
 
-    let dao = dao::sqlite_dao::SqliteDao::try_new().map_err(|e| {
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
         types::AddCategoryError::Internal(format!("Failed to create sqlite dao: {e}"))
     })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
     let _ = dao.add_category(&req)?;
     Ok(())
 }
@@ -86,9 +95,10 @@ pub async fn add_category(req: types::AddCategoryRequest) -> Result<(), types::A
 pub async fn clone_last_month(req: types::CloneMonthRequest) -> Result<(), types::CloneMonthError> {
     use dao::Dao as dao_trait;
 
-    let dao = dao::sqlite_dao::SqliteDao::try_new().map_err(|e| {
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
         types::CloneMonthError::Internal(format!("Failed to create sqlite dao: {e}"))
     })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
     let _ = dao.clone_month(&req)?;
     Ok(())
 }

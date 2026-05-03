@@ -1,34 +1,22 @@
+use std::sync::{Arc, Mutex};
+
 use crate::dao::Dao;
 use crate::types;
 
-pub(crate) struct SqliteDao {
-    db_folder: String,
+pub(crate) struct SqliteDao<CON: SqLiteConn> {
+    conn: Arc<Mutex<CON>>,
 }
 
-impl Dao for SqliteDao {
+impl<CON: SqLiteConn> Dao for SqliteDao<CON> {
     fn create_user(&self, req: &types::CreateUserRequest) -> Result<(), types::CreateUserError> {
-        let sqlite_file_path = format!("{}/{}.db", self.db_folder, req.hashed_email);
-        let sqlite_file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(sqlite_file_path.clone());
-        match sqlite_file {
-            Ok(_) => {
-                let conn = rusqlite::Connection::open(sqlite_file_path).map_err(|_| {
-                    types::CreateUserError::Internal("Failed to create user database".to_string())
-                })?;
-
-                let ddl = std::fs::read_to_string(format!("{}/USER_DDL.sql", self.db_folder))
-                    .map_err(|_| {
-                        types::CreateUserError::Internal("DDL sql is missing".to_string())
-                    })?;
-                conn.execute_batch(ddl.as_str()).map_err(|_| {
-                    types::CreateUserError::Internal("Failed to execute DDL".to_string())
-                })?;
-                Ok(())
-            }
-            Err(_) => Err(types::CreateUserError::UserAlreadyExists()),
-        }
+        self.conn
+            .lock()
+            .map_err(|_| types::CreateUserError::Internal("Failed to lock conn".to_string()))?
+            .create_db(req.hashed_email.clone())
+            .map_err(|e| match e {
+                DaoError::DbAlreadyExists() => types::CreateUserError::UserAlreadyExists(),
+                _ => types::CreateUserError::Internal("Failed to create DB".to_string()),
+            })
     }
 
     fn add_line_item(
@@ -36,7 +24,10 @@ impl Dao for SqliteDao {
         req: &types::AddLineItemRequest,
     ) -> Result<(), types::AddLineItemError> {
         let conn = self
-            .get_conn(req.hashed_email.clone())
+            .conn
+            .lock()
+            .map_err(|_| types::AddLineItemError::Internal("Failed to lock conn".to_string()))?
+            .get_db(req.hashed_email.clone())
             .map_err(|_| types::AddLineItemError::UserDoesntExists())?;
         let mut insert_stmt = conn
             .prepare("INSERT INTO line_items (description, amount, category, budget_year, budget_month) VALUES (?, ?, ?, ?, ?)")
@@ -62,7 +53,10 @@ impl Dao for SqliteDao {
         req: &types::EditLineItemRequest,
     ) -> Result<(), types::EditLineItemError> {
         let conn = self
-            .get_conn(req.hashed_email.clone())
+            .conn
+            .lock()
+            .map_err(|_| types::EditLineItemError::Internal("Failed to lock conn".to_string()))?
+            .get_db(req.hashed_email.clone())
             .map_err(|_| types::EditLineItemError::UserDoesntExists())?;
         let mut update_stmt = conn
             .prepare("UPDATE line_items SET description = ?, amount = ? WHERE id = ?")
@@ -78,14 +72,11 @@ impl Dao for SqliteDao {
     }
 
     fn delete_user(&self, req: &types::DeleteUserRequest) -> Result<(), types::DeleteUserError> {
-        let sqlite_file_path = format!("{}/{}.db", self.db_folder, req.hashed_email);
-        let res = std::fs::remove_file(sqlite_file_path);
-        match res {
-            Ok(_) => Ok(()),
-            Err(_) => Err(types::DeleteUserError::Internal(
-                "Failed to delete user".to_string(),
-            )),
-        }
+        self.conn
+            .lock()
+            .map_err(|_| types::DeleteUserError::Internal("Failed to lock conn".to_string()))?
+            .delete_db(req.hashed_email.clone())
+            .map_err(|_| types::DeleteUserError::Internal("Failed to delete user".to_string()))
     }
 
     fn delete_line_item(
@@ -93,7 +84,10 @@ impl Dao for SqliteDao {
         req: &types::DeleteLineItemRequest,
     ) -> Result<(), types::DeleteLineItemError> {
         let conn = self
-            .get_conn(req.hashed_email.clone())
+            .conn
+            .lock()
+            .map_err(|_| types::DeleteLineItemError::Internal("Failed to lock conn".to_string()))?
+            .get_db(req.hashed_email.clone())
             .map_err(|_| types::DeleteLineItemError::UserDoesntExists())?;
         let mut delete_stmt = conn
             .prepare("DELETE FROM line_items WHERE budget_year = ? AND budget_month = ? and id = ?")
@@ -116,7 +110,10 @@ impl Dao for SqliteDao {
         req: &types::GetBudgetRequest,
     ) -> Result<types::GetBudgetResponse, types::GetBudgetError> {
         let conn = self
-            .get_conn(req.hashed_email.clone())
+            .conn
+            .lock()
+            .map_err(|_| types::GetBudgetError::Internal("Failed to lock conn".to_string()))?
+            .get_db(req.hashed_email.clone())
             .map_err(|_| types::GetBudgetError::UserDoesntExists())?;
         let mut category_stmt = conn.prepare("SELECT * FROM categories").map_err(|_| {
             types::GetBudgetError::Internal("Failed to select categories".to_string())
@@ -204,8 +201,12 @@ impl Dao for SqliteDao {
 
     fn add_category(&self, req: &types::AddCategoryRequest) -> Result<(), types::AddCategoryError> {
         let conn = self
-            .get_conn(req.hashed_email.clone())
+            .conn
+            .lock()
+            .map_err(|_| types::AddCategoryError::Internal("Failed to lock conn".to_string()))?
+            .get_db(req.hashed_email.clone())
             .map_err(|_| types::AddCategoryError::UserDoesntExists())?;
+
         let mut insert_stmt = conn
             .prepare("INSERT INTO categories (category, is_expense) VALUES (?, ?)")
             .map_err(|_| {
@@ -221,7 +222,10 @@ impl Dao for SqliteDao {
 
     fn clone_month(&self, req: &types::CloneMonthRequest) -> Result<(), types::CloneMonthError> {
         let conn = self
-            .get_conn(req.hashed_email.clone())
+            .conn
+            .lock()
+            .map_err(|_| types::CloneMonthError::Internal("failed to lock conn".to_string()))?
+            .get_db(req.hashed_email.clone())
             .map_err(|_| types::CloneMonthError::UserDoesntExists())?;
 
         let mut select_stmt = conn
@@ -275,18 +279,40 @@ impl Dao for SqliteDao {
 pub(crate) enum DaoError {
     #[error("Failed to insantiate DAO: {0}")]
     FailedToCreate(String),
+    #[error("Failed to Delete DB")]
+    FailedToDelete(),
     #[error("DB doesn't exists")]
     DbDoesntExist(),
+    #[error("DB already exists")]
+    DbAlreadyExists(),
 }
 
-impl SqliteDao {
+impl<CON: SqLiteConn> SqliteDao<CON> {
+    pub(crate) fn new(conn: Arc<Mutex<CON>>) -> Self {
+        SqliteDao { conn }
+    }
+}
+
+pub(crate) trait SqLiteConn {
+    fn get_db(&self, hashed_email: String) -> Result<rusqlite::Connection, DaoError>;
+    fn create_db(&self, hashed_email: String) -> Result<(), DaoError>;
+    fn delete_db(&self, hashed_email: String) -> Result<(), DaoError>;
+}
+
+pub(crate) struct RealSqliteConn {
+    db_folder: String,
+}
+
+impl RealSqliteConn {
     pub(crate) fn try_new() -> Result<Self, DaoError> {
         let db_folder = std::env::var("SQLITE_DB_PATH")
             .map_err(|_| DaoError::FailedToCreate("SQLITE_DB_PATH env var not set".to_string()))?;
-        Ok(SqliteDao { db_folder })
+        Ok(RealSqliteConn { db_folder })
     }
+}
 
-    fn get_conn(&self, hashed_email: String) -> Result<rusqlite::Connection, DaoError> {
+impl SqLiteConn for RealSqliteConn {
+    fn get_db(&self, hashed_email: String) -> Result<rusqlite::Connection, DaoError> {
         let sqlite_file_path = format!("{}/{}.db", self.db_folder, hashed_email);
         if !std::path::Path::new(&sqlite_file_path).exists() {
             return Err(DaoError::DbDoesntExist());
@@ -294,5 +320,33 @@ impl SqliteDao {
         let conn =
             rusqlite::Connection::open(sqlite_file_path).map_err(|_| DaoError::DbDoesntExist())?;
         Ok(conn)
+    }
+
+    fn create_db(&self, hashed_email: String) -> Result<(), DaoError> {
+        let sqlite_file_path = format!("{}/{}.db", self.db_folder, hashed_email);
+        let sqlite_file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(sqlite_file_path.clone());
+        match sqlite_file {
+            Ok(_) => {
+                let conn = rusqlite::Connection::open(sqlite_file_path).map_err(|_| {
+                    DaoError::FailedToCreate("Failed to create user database".to_string())
+                })?;
+
+                let ddl = std::fs::read_to_string(format!("{}/USER_DDL.sql", self.db_folder))
+                    .map_err(|_| DaoError::FailedToCreate("DDL sql is missing".to_string()))?;
+                conn.execute_batch(ddl.as_str())
+                    .map_err(|_| DaoError::FailedToCreate("Failed to execute DDL".to_string()))?;
+                Ok(())
+            }
+            Err(_) => Err(DaoError::DbAlreadyExists()),
+        }
+    }
+
+    fn delete_db(&self, hashed_email: String) -> Result<(), DaoError> {
+        let sqlite_file_path = format!("{}/{}.db", self.db_folder, hashed_email);
+        let _ = std::fs::remove_file(sqlite_file_path).map_err(|_| DaoError::FailedToDelete())?;
+        Ok(())
     }
 }
