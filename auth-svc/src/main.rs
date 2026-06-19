@@ -3,7 +3,7 @@ use axum::routing;
 use envconfig::Envconfig;
 use rand::Rng;
 use rand::distributions::{Alphanumeric, DistString};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use tower_http::cors::CorsLayer;
 mod types;
 
@@ -19,20 +19,35 @@ const CODE_EXPIRATION_MINUTES: i64 = 10;
 const CODE_CLEANUP_INTERVAL_SECONDS: u64 = 60;
 const TOKEN_EXPIRATION_DAYS: i64 = 7;
 const TOKEN_CLEANUP_INTERVAL_SECONDS: u64 = 3600;
+const TOKEN_MAP_FILE_NAME: &str = "token_map.json";
 
 #[derive(Clone)]
 struct AppState {
     config: std::sync::Arc<Config>,
     code_map: std::sync::Arc<
-        tokio::sync::RwLock<
-            std::collections::HashMap<String, (String, chrono::DateTime<chrono::Utc>)>,
-        >,
+        tokio::sync::RwLock<HashMap<String, (String, chrono::DateTime<chrono::Utc>)>>,
     >,
     token_map: std::sync::Arc<
-        tokio::sync::RwLock<
-            std::collections::HashMap<String, (HashSet<String>, chrono::DateTime<chrono::Utc>)>,
-        >,
+        tokio::sync::RwLock<HashMap<String, (HashSet<String>, chrono::DateTime<chrono::Utc>)>>,
     >,
+}
+
+impl AppState {
+    async fn save_token_map_to_disk(&self) {
+        let token_map = self.token_map.read().await.clone();
+        let serialized = serde_json::to_string(&token_map).unwrap();
+        tokio::fs::write(TOKEN_MAP_FILE_NAME, serialized)
+            .await
+            .unwrap();
+    }
+
+    async fn load_token_map_from_disk(&self) {
+        if let Ok(contents) = tokio::fs::read(TOKEN_MAP_FILE_NAME).await {
+            if let Ok(token_map) = serde_json::from_slice(&contents) {
+                *self.token_map.write().await = token_map;
+            }
+        }
+    }
 }
 
 #[tokio::main]
@@ -45,6 +60,7 @@ async fn main() {
         code_map: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         token_map: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
     };
+    state.load_token_map_from_disk().await;
 
     let token_cleanup_monitor = tokio::spawn({
         println!(
@@ -62,6 +78,7 @@ async fn main() {
                 token_map.retain(|_, v| {
                     now.signed_duration_since(v.1) < chrono::Duration::days(TOKEN_EXPIRATION_DAYS)
                 });
+                state.save_token_map_to_disk().await;
             }
         }
     });
