@@ -19,7 +19,7 @@ run-dev-webapp:
 
 .PHONY: run-auth
 run-auth:
-	cargo run --bin auth-svc
+	SQLITE_DB_PATH="budget-lib/dbs" cargo run --bin auth-svc
 
 .PHONY: run-prod-webapp
 run-prod-webapp:

@@ -34,15 +34,17 @@ struct AppState {
 
 impl AppState {
     async fn save_token_map_to_disk(&self) {
+        let db_folder = std::env::var("SQLITE_DB_PATH").expect("SQLITE_DB_PATH env var not set");
+
         let token_map = self.token_map.read().await.clone();
         let serialized = serde_json::to_string(&token_map).unwrap();
-        tokio::fs::write(TOKEN_MAP_FILE_NAME, serialized)
-            .await
-            .unwrap();
+        let _ = tokio::fs::write(format!("{db_folder}/{TOKEN_MAP_FILE_NAME}"), serialized).await;
     }
 
     async fn load_token_map_from_disk(&self) {
-        if let Ok(contents) = tokio::fs::read(TOKEN_MAP_FILE_NAME).await {
+        let db_folder = std::env::var("SQLITE_DB_PATH").expect("SQLITE_DB_PATH env var not set");
+
+        if let Ok(contents) = tokio::fs::read(format!("{db_folder}/{TOKEN_MAP_FILE_NAME}")).await {
             if let Ok(token_map) = serde_json::from_slice(&contents) {
                 *self.token_map.write().await = token_map;
             }
