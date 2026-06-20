@@ -75,11 +75,14 @@ async fn main() {
                     TOKEN_CLEANUP_INTERVAL_SECONDS,
                 ))
                 .await;
-                let mut token_map = state.token_map.write().await;
-                let now = chrono::Utc::now();
-                token_map.retain(|_, v| {
-                    now.signed_duration_since(v.1) < chrono::Duration::days(TOKEN_EXPIRATION_DAYS)
-                });
+                {
+                    let mut token_map = state.token_map.write().await;
+                    let now = chrono::Utc::now();
+                    token_map.retain(|_, v| {
+                        now.signed_duration_since(v.1)
+                            < chrono::Duration::days(TOKEN_EXPIRATION_DAYS)
+                    });
+                }
                 state.save_token_map_to_disk().await;
             }
         }
