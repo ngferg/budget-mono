@@ -1,5 +1,7 @@
 pub(crate) mod sqlite_dao;
 
+use std::collections::HashMap;
+
 use crate::types;
 
 pub trait Dao {
@@ -15,6 +17,14 @@ pub trait Dao {
         &self,
         req: &types::DeleteLineItemRequest,
     ) -> Result<(), types::DeleteLineItemError>;
+    fn get_all_categories(
+        &self,
+        req: &types::GetAllCategoriesRequest,
+    ) -> Result<HashMap<u64, types::Category>, types::GetBudgetError>;
+    fn get_all_line_items(
+        &self,
+        req: &types::GetAllLineItemsRequest,
+    ) -> Result<Vec<types::FullLineItem>, types::GetBudgetError>;
     fn get_budget(
         &self,
         req: &types::GetBudgetRequest,

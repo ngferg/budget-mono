@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::dao::Dao;
@@ -103,6 +104,79 @@ impl<CON: SqLiteConn> Dao for SqliteDao<CON> {
                 ))
             })?;
         Ok(())
+    }
+
+    fn get_all_categories(
+        &self,
+        req: &types::GetAllCategoriesRequest,
+    ) -> Result<HashMap<u64, types::Category>, types::GetBudgetError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| types::GetBudgetError::Internal("Failed to lock conn".to_string()))?
+            .get_db(req.hashed_email.clone())
+            .map_err(|_| types::GetBudgetError::UserDoesntExists())?;
+        let mut category_stmt = conn.prepare("SELECT * FROM categories").map_err(|_| {
+            types::GetBudgetError::Internal("Failed to select categories".to_string())
+        })?;
+        let category_iter = category_stmt
+            .query_map(rusqlite::params![], |row| {
+                Ok(types::Category {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    category_type: match row.get(2)? {
+                        true => types::CategoryType::Expense,
+                        false => types::CategoryType::Income,
+                    },
+                })
+            })
+            .map_err(|_| {
+                types::GetBudgetError::Internal("Failed to query category tables".to_string())
+            })?;
+        let categories = category_iter
+            .collect::<Result<Vec<types::Category>, _>>()
+            .map_err(|e| {
+                types::GetBudgetError::Internal(format!("Failed to query category table {}", e))
+            })?;
+        Ok(categories
+            .into_iter()
+            .map(|c| (c.id, c))
+            .collect::<HashMap<_, _>>())
+    }
+
+    fn get_all_line_items(
+        &self,
+        req: &types::GetAllLineItemsRequest,
+    ) -> Result<Vec<types::FullLineItem>, types::GetBudgetError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| types::GetBudgetError::Internal("Failed to lock conn".to_string()))?
+            .get_db(req.hashed_email.clone())
+            .map_err(|_| types::GetBudgetError::UserDoesntExists())?;
+        let mut budget_stmt = conn.prepare("SELECT * FROM line_items").map_err(|_| {
+            types::GetBudgetError::Internal("Failed to select line_items".to_string())
+        })?;
+        let budget_iter = budget_stmt
+            .query_map(rusqlite::params![], |row| {
+                Ok(types::FullLineItem {
+                    id: row.get(0)?,
+                    description: row.get(1)?,
+                    amount: row.get(2)?,
+                    category: row.get(3)?,
+                    year: row.get(4)?,
+                    month: row.get(5)?,
+                })
+            })
+            .map_err(|e| {
+                types::GetBudgetError::Internal(format!("Failed to query line_item table {e}"))
+            })?;
+        let line_items = budget_iter
+            .collect::<Result<Vec<types::FullLineItem>, _>>()
+            .map_err(|e| {
+                types::GetBudgetError::Internal(format!("Failed to query line_item table {e}"))
+            })?;
+        Ok(line_items)
     }
 
     fn get_budget(

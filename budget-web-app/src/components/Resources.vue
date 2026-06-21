@@ -8,6 +8,8 @@ const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:30
 const deleteError = ref('');
 const deleteConfirm = ref(false);
 const deleting = ref(false);
+const csvDownloadError = ref('');
+const downloadingCsv = ref(false);
 
 const loginCount = ref(null);
 const loginCountError = ref('');
@@ -73,6 +75,43 @@ const logout_all = async () => {
     window.location.reload();
 }
 
+const downloadCsv = async () => {
+    downloadingCsv.value = true;
+    csvDownloadError.value = '';
+    try {
+        const params = new URLSearchParams({
+            hashed_email: store.get_hashed_email(),
+        });
+        const resp = await fetch(`${API_BASE_URL}/users/budget/csv?${params}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': store.get_token(),
+            },
+        });
+
+        if (resp.status === 200) {
+            const csv = await resp.blob();
+            const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'budget.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } else if (resp.status === 401) {
+            await store.log_out();
+            window.location.reload();
+        } else {
+            csvDownloadError.value = `Failed to download CSV (status ${resp.status}). Please try again.`;
+        }
+    } catch (e) {
+        csvDownloadError.value = 'An error occurred: ' + e.message;
+    } finally {
+        downloadingCsv.value = false;
+    }
+};
+
 </script>
 
 <template>
@@ -133,6 +172,15 @@ const logout_all = async () => {
         <h3 class="text-2xl font-bold text-emerald-300 mt-6 mb-4 border-b-2 border-emerald-500 pb-2">Account
             Management:
         </h3>
+        <div class="account-management-section data-export-section">
+            <h4 class="section-title data-export-title">Data Export</h4>
+            <p class="section-desc">Download your full budget history as a CSV file.</p>
+            <p v-if="csvDownloadError" class="download-error">{{ csvDownloadError }}</p>
+            <button class="download-btn" @click="downloadCsv" :disabled="downloadingCsv">
+                {{ downloadingCsv ? 'Downloading...' : 'Download CSV' }}
+            </button>
+        </div>
+
         <div class="account-management-section sessions-section">
             <h4 class="section-title sessions-title">Active Sessions</h4>
             <p class="section-desc">
@@ -314,6 +362,45 @@ li:hover .link-title {
     background: rgba(16, 185, 129, 0.06);
     border-color: rgba(16, 185, 129, 0.3);
     margin-bottom: 0.8em;
+}
+
+.data-export-section {
+    background: rgba(59, 130, 246, 0.06);
+    border-color: rgba(59, 130, 246, 0.3);
+    margin-bottom: 0.8em;
+}
+
+.data-export-title {
+    color: #93c5fd;
+}
+
+.download-btn {
+    background: rgba(59, 130, 246, 0.15);
+    color: #bfdbfe;
+    border: 1px solid rgba(59, 130, 246, 0.5);
+    border-radius: 6px;
+    padding: 0.5em 1.2em;
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.download-btn:hover:not(:disabled) {
+    background: rgba(59, 130, 246, 0.28);
+    border-color: #3b82f6;
+    color: #dbeafe;
+}
+
+.download-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.download-error {
+    color: #fca5a5;
+    font-size: 0.9em;
+    margin-bottom: 0.8em;
+    text-align: left;
 }
 
 .sessions-title {

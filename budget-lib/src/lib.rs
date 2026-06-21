@@ -1,7 +1,57 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+};
 
 mod dao;
 pub mod types;
+
+pub async fn get_full_budget(
+    req: types::GetFullBudgetRequest,
+) -> Result<types::FullBudgetResponse, types::GetBudgetError> {
+    use dao::Dao as dao_trait;
+
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
+        types::GetBudgetError::Internal(format!("Failed to create sqlite dao: {e}"))
+    })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
+    let line_items = dao
+        .get_all_line_items(&types::GetAllLineItemsRequest {
+            hashed_email: req.hashed_email.clone(),
+        })
+        .map_err(|e| types::GetBudgetError::Internal(format!("Failed to get line items: {e}")))?;
+    let categories = dao
+        .get_all_categories(&types::GetAllCategoriesRequest {
+            hashed_email: req.hashed_email,
+        })
+        .map_err(|e| types::GetBudgetError::Internal(format!("Failed to get categories: {e}")))?;
+
+    let mut budget = BTreeMap::new();
+    for line_item in line_items {
+        let category = categories
+            .get(&line_item.category)
+            .cloned()
+            .unwrap_or(types::Category {
+                id: u64::MAX,
+                name: "unknown".to_string(),
+                category_type: types::CategoryType::Expense,
+            });
+        let category_map = budget
+            .entry((line_item.year, line_item.month))
+            .or_insert_with(BTreeMap::new);
+        category_map
+            .entry(category)
+            .or_insert_with(Vec::new)
+            .push(types::LineItem {
+                id: line_item.id,
+                description: line_item.description,
+                amount: line_item.amount,
+                category: line_item.category,
+            });
+    }
+
+    Ok(types::FullBudgetResponse { budget })
+}
 
 pub async fn create_user(
     create_user_request: types::CreateUserRequest,

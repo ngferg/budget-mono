@@ -21,6 +21,7 @@ async fn main() {
         )
         .route("/users/budget/clone_month", post(clone_month))
         .route("/users/budget/category", post(add_category))
+        .route("/users/budget/csv", get(export_csv))
         .layer(cors);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -214,6 +215,20 @@ async fn clone_month(
                 http::StatusCode::INTERNAL_SERVER_ERROR
             }
         },
+    }
+}
+
+async fn export_csv(
+    headers: axum::http::HeaderMap,
+    axum::extract::Query(req): axum::extract::Query<budget_lib::types::GetFullBudgetRequest>,
+) -> (http::StatusCode, String) {
+    if let Err(e) = verify_auth(headers, &req.hashed_email).await {
+        return (e, "".to_string());
+    }
+    let res = budget_lib::get_full_budget(req).await;
+    match res {
+        Ok(csv) => (http::StatusCode::OK, csv.as_csv()),
+        Err(e) => (http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
 }
 

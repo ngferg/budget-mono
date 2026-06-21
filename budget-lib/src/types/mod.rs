@@ -1,5 +1,5 @@
 pub(crate) mod dao;
-use std::collections;
+use std::collections::{self, BTreeMap};
 
 use chrono::Datelike;
 
@@ -114,6 +114,21 @@ pub struct EditLineItemRequest {
 }
 
 #[derive(Debug, serde::Deserialize)]
+pub struct GetFullBudgetRequest {
+    pub hashed_email: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct GetAllLineItemsRequest {
+    pub hashed_email: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct GetAllCategoriesRequest {
+    pub hashed_email: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct GetBudgetRequest {
     pub hashed_email: String,
     pub year: u32,
@@ -147,6 +162,33 @@ pub struct CloneMonthRequest {
 }
 
 #[derive(Debug, serde::Serialize)]
+pub struct FullBudgetResponse {
+    pub budget: BTreeMap<(u32, u8), BTreeMap<Category, Vec<LineItem>>>,
+}
+
+impl FullBudgetResponse {
+    pub fn as_csv(&self) -> String {
+        let mut csv = String::new();
+        csv.push_str("year,month,category,description,amount\n");
+        for ((year, month), category_map) in &self.budget {
+            for (category, line_items) in category_map {
+                for line_item in line_items {
+                    csv.push_str(&format!(
+                        "{},{},{},{},{}\n",
+                        year,
+                        month,
+                        category.name,
+                        line_item.description,
+                        (line_item.amount as f64 / 100.0) * category.multiplier()
+                    ));
+                }
+            }
+        }
+        csv
+    }
+}
+
+#[derive(Debug, serde::Serialize)]
 pub struct GetBudgetResponse {
     pub categories: Vec<Category>,
     pub budget: collections::HashMap<u64, Vec<LineItem>>,
@@ -159,21 +201,40 @@ pub(crate) struct VerifyTokenRequest {
     pub token: String,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, serde::Serialize)]
 pub enum CategoryType {
     Income,
     Expense,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, serde::Serialize)]
 pub struct Category {
     pub id: u64,
     pub name: String,
     pub category_type: CategoryType,
 }
 
+impl Category {
+    pub fn multiplier(&self) -> f64 {
+        match self.category_type {
+            CategoryType::Income => 1.0,
+            CategoryType::Expense => -1.0,
+        }
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct LineItem {
+    pub id: u64,
+    pub description: String,
+    pub amount: u64,
+    pub category: u64,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct FullLineItem {
+    pub month: u8,
+    pub year: u32,
     pub id: u64,
     pub description: String,
     pub amount: u64,
@@ -188,7 +249,7 @@ pub enum DateError {
     InvalidMonth(),
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(try_from = "u8")]
 pub struct Month(u8);
 impl TryFrom<u8> for Month {
@@ -205,5 +266,45 @@ impl TryFrom<u8> for Month {
 impl Month {
     pub fn inner(&self) -> u8 {
         self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn full_budget_csv_includes_multiple_items_in_same_category() {
+        let category = Category {
+            id: 1,
+            name: "Groceries".to_string(),
+            category_type: CategoryType::Expense,
+        };
+        let mut category_map = BTreeMap::new();
+        category_map.insert(
+            category,
+            vec![
+                LineItem {
+                    id: 1,
+                    description: "Milk".to_string(),
+                    amount: 499,
+                    category: 1,
+                },
+                LineItem {
+                    id: 2,
+                    description: "Bread".to_string(),
+                    amount: 349,
+                    category: 1,
+                },
+            ],
+        );
+
+        let mut budget = BTreeMap::new();
+        budget.insert((2026, 1), category_map);
+
+        let csv = FullBudgetResponse { budget }.as_csv();
+
+        assert!(csv.contains("2026,1,Groceries,Milk,-4.99\n"));
+        assert!(csv.contains("2026,1,Groceries,Bread,-3.49\n"));
     }
 }
