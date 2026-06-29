@@ -277,18 +277,19 @@ const expense_breakdown = computed(() => {
         "#f97316",
         "#a78bfa",
     ];
+    const income = income_total.value;
     let cumulative = 0;
     return totals.map((cat, i) => {
-        const percentage = cat.total / grand_total;
+        const expense_percentage = cat.total / grand_total;
         const start = cumulative * 2 * Math.PI - Math.PI / 2;
-        cumulative += percentage;
+        cumulative += expense_percentage;
         const end =
-            percentage >= 1
+            expense_percentage >= 1
                 ? start + 2 * Math.PI - 0.0001
                 : cumulative * 2 * Math.PI - Math.PI / 2;
         return {
             ...cat,
-            percentage,
+            income_percentage: income > 0 ? cat.total / income : null,
             start,
             end,
             color: colors[i % colors.length],
@@ -419,7 +420,11 @@ const add_category = async () => {
                     ></span>
                     <span class="legend-label">{{ cat.name }}</span>
                     <span class="legend-value"
-                        >{{ (cat.percentage * 100).toFixed(1) }}%&ensp;({{
+                        ><template v-if="cat.income_percentage !== null"
+                            >{{
+                                (cat.income_percentage * 100).toFixed(1)
+                            }}%&ensp;</template
+                        >({{
                             formatCents(cat.total)
                         }})</span
                     >
