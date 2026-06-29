@@ -261,7 +261,8 @@ const expense_breakdown = computed(() => {
                 0,
             ),
         }))
-        .filter((c) => c.total > 0);
+        .filter((c) => c.total > 0)
+        .sort((a, b) => b.total - a.total);
     const grand_total = totals.reduce((sum, c) => sum + c.total, 0);
     if (grand_total === 0) return [];
     const colors = [
