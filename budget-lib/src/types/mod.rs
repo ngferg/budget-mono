@@ -77,6 +77,16 @@ pub enum CloneMonthError {
     Internal(String),
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum GetSubscriptionError {
+    #[error("User doesn't exists")]
+    UserDoesntExists(),
+    #[error("Subscription doesn't exists")]
+    SubscriptionDoesntExists(),
+    #[error("Internal Error: {0}")]
+    Internal(String),
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct CreateUserRequest {
     pub hashed_email: String,
@@ -161,6 +171,11 @@ pub struct CloneMonthRequest {
     pub target_month: Month,
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct GetSubscriptionRequest {
+    pub hashed_email: String,
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct FullBudgetResponse {
     pub budget: BTreeMap<(u32, u8), BTreeMap<Category, Vec<LineItem>>>,
@@ -241,6 +256,92 @@ pub struct FullLineItem {
     pub category: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SubscriptionStatus {
+    /// One free month, starting when the account was created.
+    FreeTrial,
+    /// Paying $5/month through Stripe.
+    Active,
+    /// Trial ended (or a paid subscription lapsed) with nothing active.
+    Inactive,
+    /// One-time $100 lifetime license, or the early-adopter grant.
+    Lifetime,
+}
+
+impl SubscriptionStatus {
+    /// Parses the `status` column of the `subscription` table. The column has a
+    /// CHECK constraint, so an unrecognised value means the row is corrupt and
+    /// the caller should treat it as "no access".
+    pub fn from_db(raw: &str) -> Option<Self> {
+        match raw {
+            "free_trial" => Some(Self::FreeTrial),
+            "active" => Some(Self::Active),
+            "inactive" => Some(Self::Inactive),
+            "lifetime" => Some(Self::Lifetime),
+            _ => None,
+        }
+    }
+}
+
+/// Whether the user may currently use the budget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Entitlement {
+    /// Full access: lifetime license or an active paid subscription.
+    Entitled,
+    /// Full access, but on the clock: still inside the free trial window.
+    Trialing,
+    /// No access: the trial expired or the subscription lapsed without renewal.
+    Expired,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Subscription {
+    pub status: SubscriptionStatus,
+    pub trial_started_at: String,
+    pub trial_ends_at: String,
+    pub current_period_end: Option<String>,
+    // Populated by the (not-yet-written) Stripe payments code; never serialized
+    // out to clients.
+    #[serde(skip)]
+    pub stripe_customer_id: Option<String>,
+    #[serde(skip)]
+    pub stripe_subscription_id: Option<String>,
+    #[serde(skip)]
+    pub stripe_payment_intent_id: Option<String>,
+    pub updated_at: String,
+}
+
+impl Subscription {
+    pub fn entitlement(&self) -> Entitlement {
+        match self.status {
+            SubscriptionStatus::Lifetime | SubscriptionStatus::Active => Entitlement::Entitled,
+            SubscriptionStatus::Inactive => Entitlement::Expired,
+            SubscriptionStatus::FreeTrial => {
+                if self.trial_is_current() {
+                    Entitlement::Trialing
+                } else {
+                    Entitlement::Expired
+                }
+            }
+        }
+    }
+
+    /// True unless the user has run out of access.
+    pub fn has_access(&self) -> bool {
+        !matches!(self.entitlement(), Entitlement::Expired)
+    }
+
+    fn trial_is_current(&self) -> bool {
+        match chrono::DateTime::parse_from_rfc3339(&self.trial_ends_at) {
+            Ok(ends_at) => chrono::Utc::now() < ends_at.with_timezone(&chrono::Utc),
+            // An unparseable timestamp fails closed.
+            Err(_) => false,
+        }
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum DateError {
     #[error("Invalid year")]
@@ -306,5 +407,70 @@ mod tests {
 
         assert!(csv.contains("2026,1,Groceries,Milk,-4.99\n"));
         assert!(csv.contains("2026,1,Groceries,Bread,-3.49\n"));
+    }
+
+    fn sub(status: SubscriptionStatus, trial_ends_at: &str) -> Subscription {
+        Subscription {
+            status,
+            trial_started_at: "2026-01-01T00:00:00Z".to_string(),
+            trial_ends_at: trial_ends_at.to_string(),
+            current_period_end: None,
+            stripe_customer_id: None,
+            stripe_subscription_id: None,
+            stripe_payment_intent_id: None,
+            updated_at: "2026-01-01T00:00:00Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn lifetime_and_active_are_entitled_regardless_of_trial_date() {
+        assert_eq!(
+            sub(SubscriptionStatus::Lifetime, "2000-01-01T00:00:00Z").entitlement(),
+            Entitlement::Entitled
+        );
+        assert_eq!(
+            sub(SubscriptionStatus::Active, "2000-01-01T00:00:00Z").entitlement(),
+            Entitlement::Entitled
+        );
+    }
+
+    #[test]
+    fn free_trial_entitlement_depends_on_trial_end() {
+        assert_eq!(
+            sub(SubscriptionStatus::FreeTrial, "2999-01-01T00:00:00Z").entitlement(),
+            Entitlement::Trialing
+        );
+        assert_eq!(
+            sub(SubscriptionStatus::FreeTrial, "2000-01-01T00:00:00Z").entitlement(),
+            Entitlement::Expired
+        );
+    }
+
+    #[test]
+    fn inactive_and_expired_trial_have_no_access() {
+        assert!(!sub(SubscriptionStatus::Inactive, "2999-01-01T00:00:00Z").has_access());
+        assert!(!sub(SubscriptionStatus::FreeTrial, "2000-01-01T00:00:00Z").has_access());
+        assert!(sub(SubscriptionStatus::FreeTrial, "2999-01-01T00:00:00Z").has_access());
+    }
+
+    #[test]
+    fn unparseable_trial_end_fails_closed() {
+        assert_eq!(
+            sub(SubscriptionStatus::FreeTrial, "not-a-date").entitlement(),
+            Entitlement::Expired
+        );
+    }
+
+    #[test]
+    fn status_parses_from_db_strings() {
+        assert_eq!(
+            SubscriptionStatus::from_db("free_trial"),
+            Some(SubscriptionStatus::FreeTrial)
+        );
+        assert_eq!(
+            SubscriptionStatus::from_db("lifetime"),
+            Some(SubscriptionStatus::Lifetime)
+        );
+        assert_eq!(SubscriptionStatus::from_db("bogus"), None);
     }
 }

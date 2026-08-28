@@ -3,6 +3,10 @@
 clean-dbs:
 	rm -rf budget-lib/dbs/*.db
 
+.PHONY: migrate-dbs
+migrate-dbs:
+	SQLITE_DB_PATH="budget-lib/dbs" ./budget-lib/dbs/migrations/apply.sh
+
 .PHONY: run-rest-fresh
 run-rest-fresh:
 	make clean-dbs

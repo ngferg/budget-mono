@@ -22,6 +22,7 @@ async fn main() {
         .route("/users/budget/clone_month", post(clone_month))
         .route("/users/budget/category", post(add_category))
         .route("/users/budget/csv", get(export_csv))
+        .route("/users/subscription", get(get_subscription))
         .layer(cors);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -44,6 +45,12 @@ async fn find_budget(
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::GetBudgetRequest>,
 ) -> (http::StatusCode, axum::Json<serde_json::Value>) {
     if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
+        return (
+            e,
+            axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+        );
+    }
+    if let Err(e) = verify_entitlement(req.hashed_email.as_str()).await {
         return (
             e,
             axum::Json(serde_json::from_str("{}").unwrap_or_default()),
@@ -119,6 +126,9 @@ async fn delete_line_item(
     if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
         return e;
     }
+    if let Err(e) = verify_entitlement(req.hashed_email.as_str()).await {
+        return e;
+    }
     let res = budget_lib::delete_line_item(req).await;
     match res {
         Ok(()) => http::StatusCode::NO_CONTENT,
@@ -143,6 +153,9 @@ async fn add_line_item(
     if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
         return e;
     }
+    if let Err(e) = verify_entitlement(req.hashed_email.as_str()).await {
+        return e;
+    }
     let res = budget_lib::add_line_item(req).await;
     match res {
         Ok(()) => http::StatusCode::CREATED,
@@ -160,6 +173,9 @@ async fn edit_line_item(
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::EditLineItemRequest>,
 ) -> http::StatusCode {
     if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
+        return e;
+    }
+    if let Err(e) = verify_entitlement(req.hashed_email.as_str()).await {
         return e;
     }
     let res = budget_lib::edit_line_item(req).await;
@@ -184,6 +200,9 @@ async fn add_category(
     if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
         return e;
     }
+    if let Err(e) = verify_entitlement(req.hashed_email.as_str()).await {
+        return e;
+    }
     let res = budget_lib::add_category(req).await;
     match res {
         Ok(()) => http::StatusCode::CREATED,
@@ -201,6 +220,9 @@ async fn clone_month(
     axum::extract::Json(req): axum::extract::Json<budget_lib::types::CloneMonthRequest>,
 ) -> http::StatusCode {
     if let Err(e) = verify_auth(headers, &req.hashed_email.as_str()).await {
+        return e;
+    }
+    if let Err(e) = verify_entitlement(req.hashed_email.as_str()).await {
         return e;
     }
     let res = budget_lib::clone_last_month(req).await;
@@ -225,10 +247,65 @@ async fn export_csv(
     if let Err(e) = verify_auth(headers, &req.hashed_email).await {
         return (e, "".to_string());
     }
+    if let Err(e) = verify_entitlement(&req.hashed_email).await {
+        return (e, "".to_string());
+    }
     let res = budget_lib::get_full_budget(req).await;
     match res {
         Ok(csv) => (http::StatusCode::OK, csv.as_csv()),
         Err(e) => (http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    }
+}
+
+async fn get_subscription(
+    headers: axum::http::HeaderMap,
+    axum::extract::Query(req): axum::extract::Query<budget_lib::types::GetSubscriptionRequest>,
+) -> (http::StatusCode, axum::Json<serde_json::Value>) {
+    if let Err(e) = verify_auth(headers, req.hashed_email.as_str()).await {
+        return (
+            e,
+            axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+        );
+    }
+    match budget_lib::get_subscription(req).await {
+        Ok(sub) => {
+            let body = serde_json::json!({
+                "status": sub.status,
+                "entitlement": sub.entitlement(),
+                "trial_ends_at": sub.trial_ends_at,
+                "current_period_end": sub.current_period_end,
+            });
+            (http::StatusCode::OK, axum::Json(body))
+        }
+        Err(budget_lib::types::GetSubscriptionError::UserDoesntExists())
+        | Err(budget_lib::types::GetSubscriptionError::SubscriptionDoesntExists()) => (
+            http::StatusCode::NOT_FOUND,
+            axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+        ),
+        Err(budget_lib::types::GetSubscriptionError::Internal(_)) => (
+            http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+        ),
+    }
+}
+
+/// Rejects the request unless the user currently has budget access: a lifetime
+/// license, an active paid subscription, or a free trial that has not run out.
+/// Auth is assumed to have already been checked by the caller.
+async fn verify_entitlement(hashed_email: &str) -> Result<(), http::StatusCode> {
+    let req = budget_lib::types::GetSubscriptionRequest {
+        hashed_email: hashed_email.to_string(),
+    };
+    match budget_lib::get_subscription(req).await {
+        Ok(sub) if sub.has_access() => Ok(()),
+        Ok(_) => Err(http::StatusCode::PAYMENT_REQUIRED),
+        Err(budget_lib::types::GetSubscriptionError::UserDoesntExists())
+        | Err(budget_lib::types::GetSubscriptionError::SubscriptionDoesntExists()) => {
+            Err(http::StatusCode::NOT_FOUND)
+        }
+        Err(budget_lib::types::GetSubscriptionError::Internal(_)) => {
+            Err(http::StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
 

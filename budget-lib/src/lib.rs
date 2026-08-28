@@ -66,6 +66,18 @@ pub async fn create_user(
     Ok(())
 }
 
+pub async fn get_subscription(
+    req: types::GetSubscriptionRequest,
+) -> Result<types::Subscription, types::GetSubscriptionError> {
+    use dao::Dao as dao_trait;
+
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
+        types::GetSubscriptionError::Internal(format!("Failed to create sqlite dao: {e}"))
+    })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
+    dao.get_subscription(&req)
+}
+
 pub async fn delete_user(
     del_user_request: types::DeleteUserRequest,
 ) -> Result<(), types::DeleteUserError> {

@@ -21,5 +21,7 @@ target
 .idea/
 
 budget-lib/dbs/*
+!budget-lib/dbs/USER_DDL.sql
+!budget-lib/dbs/migrations/
 .DS_Store
 *token_map.json

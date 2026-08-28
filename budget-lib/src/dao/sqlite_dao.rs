@@ -347,6 +347,80 @@ impl<CON: SqLiteConn> Dao for SqliteDao<CON> {
 
         Ok(())
     }
+
+    fn get_subscription(
+        &self,
+        req: &types::GetSubscriptionRequest,
+    ) -> Result<types::Subscription, types::GetSubscriptionError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| {
+                types::GetSubscriptionError::Internal("Failed to lock conn".to_string())
+            })?
+            .get_db(req.hashed_email.clone())
+            .map_err(|_| types::GetSubscriptionError::UserDoesntExists())?;
+
+        let mut select_stmt = conn
+            .prepare(
+                "SELECT status, trial_started_at, trial_ends_at, current_period_end, \
+                 stripe_customer_id, stripe_subscription_id, stripe_payment_intent_id, updated_at \
+                 FROM subscription WHERE id = 1",
+            )
+            .map_err(|e| {
+                types::GetSubscriptionError::Internal(format!(
+                    "Failed to prepare subscription select: {e}"
+                ))
+            })?;
+
+        let row = select_stmt
+            .query_row(rusqlite::params![], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, Option<String>>(6)?,
+                    row.get::<_, String>(7)?,
+                ))
+            })
+            .map_err(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => {
+                    types::GetSubscriptionError::SubscriptionDoesntExists()
+                }
+                other => types::GetSubscriptionError::Internal(format!(
+                    "Failed to query subscription: {other}"
+                )),
+            })?;
+
+        let (
+            status,
+            trial_started_at,
+            trial_ends_at,
+            current_period_end,
+            stripe_customer_id,
+            stripe_subscription_id,
+            stripe_payment_intent_id,
+            updated_at,
+        ) = row;
+
+        Ok(types::Subscription {
+            status: types::SubscriptionStatus::from_db(&status).ok_or_else(|| {
+                types::GetSubscriptionError::Internal(format!(
+                    "Unrecognised subscription status: {status}"
+                ))
+            })?,
+            trial_started_at,
+            trial_ends_at,
+            current_period_end,
+            stripe_customer_id,
+            stripe_subscription_id,
+            stripe_payment_intent_id,
+            updated_at,
+        })
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

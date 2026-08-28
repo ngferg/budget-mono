@@ -31,4 +31,8 @@ pub trait Dao {
     ) -> Result<types::GetBudgetResponse, types::GetBudgetError>;
     fn clone_month(&self, req: &types::CloneMonthRequest) -> Result<(), types::CloneMonthError>;
     fn add_category(&self, req: &types::AddCategoryRequest) -> Result<(), types::AddCategoryError>;
+    fn get_subscription(
+        &self,
+        req: &types::GetSubscriptionRequest,
+    ) -> Result<types::Subscription, types::GetSubscriptionError>;
 }
