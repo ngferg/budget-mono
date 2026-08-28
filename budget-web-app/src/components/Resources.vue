@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { store } from '../store.js'
+import { httpErrorMessage } from '../http.js'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:3001';
@@ -103,7 +104,7 @@ const downloadCsv = async () => {
             await store.log_out();
             window.location.reload();
         } else {
-            csvDownloadError.value = `Failed to download CSV (status ${resp.status}). Please try again.`;
+            csvDownloadError.value = httpErrorMessage(resp.status);
         }
     } catch (e) {
         csvDownloadError.value = 'An error occurred: ' + e.message;

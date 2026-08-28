@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, nextTick, computed } from "vue";
 import { store } from "../store.js";
+import { httpErrorMessage } from "../http.js";
 
 const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
@@ -56,7 +57,7 @@ const get_budget = async () => {
             );
             last_month_clonable.value = j.last_month_clonable;
         } else {
-            error.value = "Error: " + resp.status;
+            error.value = httpErrorMessage(resp.status);
             if (resp.status === 401) {
                 store.log_out();
                 window.location.reload();
@@ -97,7 +98,7 @@ const delete_line_item = async (item_id) => {
         if (resp.status === 204) {
             await get_budget();
         } else {
-            error.value = "Error: " + resp.status;
+            error.value = httpErrorMessage(resp.status);
         }
     } catch (e) {
         error.value = "Error: " + e.message;
@@ -143,7 +144,7 @@ const new_line_item = async (category_id) => {
                 descInputs[category_id]?.focus();
             });
         } else {
-            error.value = "Error: " + resp.status;
+            error.value = httpErrorMessage(resp.status);
         }
     } catch (e) {
         error.value = "Error: " + e.message;
@@ -191,7 +192,7 @@ const save_edit_line_item = async () => {
             close_edit_modal();
             await get_budget();
         } else {
-            error.value = "Error: " + resp.status;
+            error.value = httpErrorMessage(resp.status);
         }
     } catch (e) {
         error.value = "Error: " + e.message;
@@ -223,7 +224,7 @@ const clone_last_month = async () => {
         if (resp.status === 201) {
             await get_budget();
         } else {
-            error.value = "Error: " + resp.status;
+            error.value = httpErrorMessage(resp.status);
         }
     } catch (e) {
         error.value = "Error: " + e.message;
@@ -369,7 +370,7 @@ const add_category = async () => {
             new_category_name.value = "";
             await get_budget();
         } else {
-            error.value = "Error: " + resp.status;
+            error.value = httpErrorMessage(resp.status);
         }
     } catch (e) {
         error.value = "Error: " + e.message;
