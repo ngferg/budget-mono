@@ -6,6 +6,10 @@ use tower_http::cors::CorsLayer;
 
 #[tokio::main]
 async fn main() {
+    // reqwest talks to Stripe over rustls; install a crypto provider before the
+    // first HTTPS call, same as the auth service does.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     // CORS configuration
     let cors = CorsLayer::permissive();
     // our router
@@ -23,6 +27,11 @@ async fn main() {
         .route("/users/budget/category", post(add_category))
         .route("/users/budget/csv", get(export_csv))
         .route("/users/subscription", get(get_subscription))
+        .route(
+            "/users/subscription/checkout",
+            post(create_checkout_session),
+        )
+        .route("/webhooks/stripe", post(handle_stripe_webhook))
         .layer(cors);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -286,6 +295,119 @@ async fn get_subscription(
             http::StatusCode::INTERNAL_SERVER_ERROR,
             axum::Json(serde_json::from_str("{}").unwrap_or_default()),
         ),
+    }
+}
+
+/// Starts a Stripe Checkout Session for the monthly plan and returns its hosted
+/// URL for the browser to redirect to. This is the button a user lands on once
+/// their free trial lapses (a `402` from the entitlement check).
+async fn create_checkout_session(
+    headers: axum::http::HeaderMap,
+    axum::extract::Json(req): axum::extract::Json<budget_lib::types::StartCheckoutRequest>,
+) -> (http::StatusCode, axum::Json<serde_json::Value>) {
+    if let Err(e) = verify_auth(headers, req.hashed_email.as_str()).await {
+        return (
+            e,
+            axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+        );
+    }
+    match budget_lib::start_subscription_checkout(req).await {
+        Ok(res) => (
+            http::StatusCode::OK,
+            axum::Json(serde_json::to_value(res).unwrap_or_default()),
+        ),
+        Err(budget_lib::types::StartCheckoutError::UserDoesntExists()) => (
+            http::StatusCode::NOT_FOUND,
+            axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+        ),
+        Err(budget_lib::types::StartCheckoutError::StripeNotConfigured()) => {
+            eprintln!(
+                "Checkout requested but Stripe is not configured: set STRIPE_SECRET_KEY and \
+                 STRIPE_PRICE_ID in this service's environment"
+            );
+            (
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+            )
+        }
+        Err(budget_lib::types::StartCheckoutError::Stripe(msg)) => {
+            eprintln!("Stripe checkout error: {msg}");
+            (
+                http::StatusCode::BAD_GATEWAY,
+                axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+            )
+        }
+        Err(budget_lib::types::StartCheckoutError::Internal(msg)) => {
+            eprintln!("Checkout internal error: {msg}");
+            (
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+            )
+        }
+    }
+}
+
+/// Receives Stripe webhooks. The body must be read raw so its bytes match what
+/// Stripe signed, so this handler takes `Bytes` rather than `Json`. A bad or
+/// missing signature is a `400`; anything we can't finish processing is a `500`
+/// so Stripe retries; everything else (including events we don't act on) is a
+/// `200` acknowledgement.
+async fn handle_stripe_webhook(
+    headers: axum::http::HeaderMap,
+    body: axum::body::Bytes,
+) -> http::StatusCode {
+    let secret = match std::env::var("STRIPE_WEBHOOK_SECRET") {
+        Ok(s) => s,
+        Err(_) => {
+            eprintln!("STRIPE_WEBHOOK_SECRET is not set; rejecting webhook");
+            return http::StatusCode::INTERNAL_SERVER_ERROR;
+        }
+    };
+    let signature = match headers
+        .get("stripe-signature")
+        .and_then(|v| v.to_str().ok())
+    {
+        Some(s) => s,
+        None => return http::StatusCode::BAD_REQUEST,
+    };
+
+    let event = match budget_lib::stripe::construct_event(&body, signature, &secret) {
+        Ok(event) => event,
+        Err(e) => {
+            eprintln!("Rejected Stripe webhook: {e}");
+            return http::StatusCode::BAD_REQUEST;
+        }
+    };
+
+    if event.event_type != "checkout.session.completed" {
+        // Acknowledged but not acted on.
+        return http::StatusCode::OK;
+    }
+
+    let session: budget_lib::stripe::CompletedCheckoutSession =
+        match serde_json::from_value(event.data.object) {
+            Ok(session) => session,
+            Err(e) => {
+                eprintln!("checkout.session.completed with unexpected shape: {e}");
+                return http::StatusCode::BAD_REQUEST;
+            }
+        };
+
+    match budget_lib::record_completed_checkout(session).await {
+        Ok(()) => http::StatusCode::OK,
+        // Nothing actionable — acknowledge so Stripe stops retrying.
+        Err(budget_lib::types::RecordCheckoutError::NoAccountReference())
+        | Err(budget_lib::types::RecordCheckoutError::UserDoesntExists()) => {
+            eprintln!(
+                "checkout.session.completed {} could not be matched to an account",
+                event.id
+            );
+            http::StatusCode::OK
+        }
+        Err(budget_lib::types::RecordCheckoutError::Internal(msg)) => {
+            eprintln!("Failed to record checkout {}: {msg}", event.id);
+            http::StatusCode::INTERNAL_SERVER_ERROR
+        }
     }
 }
 

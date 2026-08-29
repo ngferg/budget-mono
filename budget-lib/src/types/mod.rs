@@ -87,6 +87,30 @@ pub enum GetSubscriptionError {
     Internal(String),
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum StartCheckoutError {
+    #[error("User doesn't exists")]
+    UserDoesntExists(),
+    #[error("Stripe is not configured on the server")]
+    StripeNotConfigured(),
+    #[error("Stripe Error: {0}")]
+    Stripe(String),
+    #[error("Internal Error: {0}")]
+    Internal(String),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum RecordCheckoutError {
+    /// The Checkout Session had no `client_reference_id`, so there is no account
+    /// to attach the subscription to.
+    #[error("Checkout session is not tied to an account")]
+    NoAccountReference(),
+    #[error("User doesn't exists")]
+    UserDoesntExists(),
+    #[error("Internal Error: {0}")]
+    Internal(String),
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct CreateUserRequest {
     pub hashed_email: String,
@@ -174,6 +198,29 @@ pub struct CloneMonthRequest {
 #[derive(Debug, serde::Deserialize)]
 pub struct GetSubscriptionRequest {
     pub hashed_email: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct StartCheckoutRequest {
+    pub hashed_email: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct CheckoutSessionResponse {
+    /// Stripe-hosted Checkout URL the client should redirect the browser to.
+    pub url: String,
+}
+
+/// Everything the webhook learned from a completed Checkout Session that needs
+/// to land in the `subscription` table.
+#[derive(Debug)]
+pub struct ActivateSubscriptionRequest {
+    pub hashed_email: String,
+    pub stripe_customer_id: Option<String>,
+    pub stripe_subscription_id: Option<String>,
+    pub stripe_payment_intent_id: Option<String>,
+    /// Paid-through date mirrored from Stripe, if it could be fetched.
+    pub current_period_end: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize)]

@@ -1,0 +1,31 @@
+meta {
+  name: create checkout session
+  type: http
+  seq: 10
+}
+
+post {
+  url: http://localhost:3000/users/subscription/checkout
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: {{token}}
+}
+
+body:json {
+  {
+    "hashed_email": "{{hashed_email}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.url: isString
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

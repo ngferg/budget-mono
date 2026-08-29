@@ -25,3 +25,6 @@ budget-lib/dbs/*
 !budget-lib/dbs/migrations/
 .DS_Store
 *token_map.json
+
+# Local dev env vars (Stripe keys etc.); the committed template is .env.example.
+/.env

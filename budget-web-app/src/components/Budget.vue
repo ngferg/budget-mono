@@ -7,6 +7,10 @@ const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
 const error = ref("");
+const needs_subscription = ref(false);
+const starting_checkout = ref(false);
+const activating = ref(false);
+const checkout_notice = ref("");
 const budget = ref(null);
 const categories = ref(null);
 const year = ref(new Date().getFullYear());
@@ -49,6 +53,7 @@ const get_budget = async () => {
         });
         if (resp.status === 200) {
             const j = await resp.json();
+            needs_subscription.value = false;
             budget.value = j.budget;
             categories.value = j.categories;
             item_amounts.value = new Array(categories.value.length).fill("");
@@ -56,6 +61,11 @@ const get_budget = async () => {
                 "",
             );
             last_month_clonable.value = j.last_month_clonable;
+        } else if (resp.status === 402) {
+            // Trial lapsed / subscription inactive: surface the subscribe flow
+            // instead of a bare error.
+            needs_subscription.value = true;
+            error.value = "";
         } else {
             error.value = httpErrorMessage(resp.status);
             if (resp.status === 401) {
@@ -68,8 +78,84 @@ const get_budget = async () => {
     }
 };
 
+// Read (and clear) the ?checkout= marker Stripe Checkout appends to its
+// return URL, so a page refresh doesn't keep re-showing the banner. Returns
+// the outcome ("success" | "cancelled") or null.
+const consume_checkout_return = () => {
+    const params = new URLSearchParams(window.location.search);
+    const outcome = params.get("checkout");
+    if (outcome === "success") {
+        checkout_notice.value =
+            "Payment received — thanks for subscribing! Your access is being activated.";
+    } else if (outcome === "cancelled") {
+        checkout_notice.value = "Checkout cancelled. You can subscribe whenever you're ready.";
+    }
+    params.delete("checkout");
+    params.delete("session_id");
+    const qs = params.toString();
+    window.history.replaceState(
+        {},
+        "",
+        window.location.pathname + (qs ? "?" + qs : ""),
+    );
+    return outcome;
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// After returning from Checkout the activation webhook may not have landed yet,
+// so the first get_budget() can still come back 402. Re-poll for a short while
+// before giving up and showing the subscribe screen again.
+const wait_for_activation = async () => {
+    activating.value = true;
+    for (let attempt = 0; attempt < 6; attempt++) {
+        await get_budget();
+        if (!needs_subscription.value) break;
+        await sleep(2000);
+    }
+    activating.value = false;
+    if (needs_subscription.value) {
+        checkout_notice.value =
+            "Payment received, but activation is taking longer than usual. Refresh in a minute — you won't be charged again.";
+    } else {
+        checkout_notice.value = "You're all set — thanks for subscribing!";
+    }
+};
+
+const start_checkout = async () => {
+    starting_checkout.value = true;
+    error.value = "";
+    try {
+        const resp = await fetch(API_BASE_URL + "/users/subscription/checkout", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: store.get_token(),
+            },
+            body: JSON.stringify({
+                hashed_email: store.get_hashed_email(),
+            }),
+        });
+        if (resp.status === 200) {
+            const { url } = await resp.json();
+            window.location.href = url;
+        } else {
+            error.value = httpErrorMessage(resp.status);
+            starting_checkout.value = false;
+        }
+    } catch (e) {
+        error.value = "Error: " + e.message;
+        starting_checkout.value = false;
+    }
+};
+
 onMounted(async () => {
-    await get_budget();
+    const outcome = consume_checkout_return();
+    if (outcome === "success") {
+        await wait_for_activation();
+    } else {
+        await get_budget();
+    }
 });
 
 const formatCents = (cents) => {
@@ -383,7 +469,31 @@ const add_category = async () => {
         <p class="error-text">{{ error }}</p>
     </div>
 
-    <div v-if="budget !== null" class="card">
+    <div class="card" v-if="checkout_notice">
+        <p class="notice-text">{{ checkout_notice }}</p>
+    </div>
+
+    <div v-if="activating" class="card subscribe-card">
+        <h2>Activating your subscription…</h2>
+        <p>This usually takes a few seconds. Hang tight.</p>
+    </div>
+
+    <div v-if="needs_subscription && !activating" class="card subscribe-card">
+        <h2>Your free trial has ended</h2>
+        <p>
+            Subscribe for $5/month to keep using your budget. Payments are
+            handled securely by Stripe.
+        </p>
+        <button
+            class="subscribe-button"
+            :disabled="starting_checkout"
+            @click="start_checkout"
+        >
+            {{ starting_checkout ? "Redirecting to Stripe…" : "Subscribe — $5/month" }}
+        </button>
+    </div>
+
+    <div v-if="budget !== null && !needs_subscription" class="card">
         <h2 class="justify-center">
             <button @click="last_month" v-if="show_back_button">&lt;</button
             >Budget for {{ month }}/{{ year
@@ -599,6 +709,33 @@ const add_category = async () => {
 .error-text {
     color: #ff6b6b;
     font-weight: 500;
+}
+
+.notice-text {
+    color: #a7f3d0;
+    font-weight: 500;
+}
+
+.subscribe-card {
+    text-align: center;
+}
+
+.subscribe-card p {
+    color: #a7f3d0;
+    line-height: 1.6;
+    max-width: 420px;
+    margin: 0.75em auto 1.25em;
+}
+
+.subscribe-button {
+    background-color: #10b981;
+    font-size: 1.05em;
+    padding: 0.6em 1.4em;
+}
+
+.subscribe-button:disabled {
+    opacity: 0.6;
+    cursor: default;
 }
 
 h1,

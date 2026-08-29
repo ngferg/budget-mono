@@ -4,7 +4,14 @@ use std::{
 };
 
 mod dao;
+pub mod stripe;
 pub mod types;
+
+/// Where Stripe Checkout returns the customer. Overridable so dev, preview and
+/// prod each send the browser back to the right origin.
+fn public_base_url() -> String {
+    std::env::var("PUBLIC_BASE_URL").unwrap_or_else(|_| "http://localhost:5173".to_string())
+}
 
 pub async fn get_full_budget(
     req: types::GetFullBudgetRequest,
@@ -76,6 +83,86 @@ pub async fn get_subscription(
     })?;
     let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
     dao.get_subscription(&req)
+}
+
+/// Opens a Stripe Checkout Session so the user can start paying for the monthly
+/// plan, and hands back the hosted URL to redirect them to. The account's hashed
+/// email rides along as the session's `client_reference_id` so the webhook can
+/// match the payment back to this database.
+pub async fn start_subscription_checkout(
+    req: types::StartCheckoutRequest,
+) -> Result<types::CheckoutSessionResponse, types::StartCheckoutError> {
+    use dao::Dao as dao_trait;
+
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
+        types::StartCheckoutError::Internal(format!("Failed to create sqlite dao: {e}"))
+    })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
+
+    // Confirms the account exists (and surfaces a clean 404) before we spend a
+    // round trip on Stripe.
+    dao.get_subscription(&types::GetSubscriptionRequest {
+        hashed_email: req.hashed_email.clone(),
+    })
+    .map_err(|e| match e {
+        types::GetSubscriptionError::UserDoesntExists()
+        | types::GetSubscriptionError::SubscriptionDoesntExists() => {
+            types::StartCheckoutError::UserDoesntExists()
+        }
+        types::GetSubscriptionError::Internal(msg) => types::StartCheckoutError::Internal(msg),
+    })?;
+
+    let price_id = std::env::var("STRIPE_PRICE_ID")
+        .map_err(|_| types::StartCheckoutError::StripeNotConfigured())?;
+    let base = public_base_url();
+    let success_url = format!("{base}/?checkout=success&session_id={{CHECKOUT_SESSION_ID}}");
+    let cancel_url = format!("{base}/?checkout=cancelled");
+
+    let client = stripe::StripeClient::from_env().map_err(|e| match e {
+        stripe::StripeError::MissingApiKey => types::StartCheckoutError::StripeNotConfigured(),
+        other => types::StartCheckoutError::Stripe(other.to_string()),
+    })?;
+    let session = client
+        .create_checkout_session(&price_id, &req.hashed_email, &success_url, &cancel_url)
+        .await
+        .map_err(|e| types::StartCheckoutError::Stripe(e.to_string()))?;
+
+    Ok(types::CheckoutSessionResponse { url: session.url })
+}
+
+/// Applies a verified `checkout.session.completed` event: flips the paying
+/// account to `active` and stores Stripe's customer/subscription identifiers.
+/// Safe to call more than once for the same session.
+pub async fn record_completed_checkout(
+    session: stripe::CompletedCheckoutSession,
+) -> Result<(), types::RecordCheckoutError> {
+    use dao::Dao as dao_trait;
+
+    let hashed_email = session
+        .client_reference_id
+        .clone()
+        .ok_or(types::RecordCheckoutError::NoAccountReference())?;
+
+    // Mirror the paid-through date so entitlement checks never have to call
+    // Stripe. Purely advisory — a failure here just leaves the column as-is.
+    let current_period_end = match (&session.subscription, stripe::StripeClient::from_env()) {
+        (Some(subscription_id), Ok(client)) => {
+            client.subscription_period_end(subscription_id).await
+        }
+        _ => None,
+    };
+
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
+        types::RecordCheckoutError::Internal(format!("Failed to create sqlite dao: {e}"))
+    })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
+    dao.activate_subscription(&types::ActivateSubscriptionRequest {
+        hashed_email,
+        stripe_customer_id: session.customer,
+        stripe_subscription_id: session.subscription,
+        stripe_payment_intent_id: session.payment_intent,
+        current_period_end,
+    })
 }
 
 pub async fn delete_user(

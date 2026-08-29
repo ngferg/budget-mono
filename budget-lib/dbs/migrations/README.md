@@ -45,6 +45,7 @@ The `subscription` table holds one row (`id = 1`).
 | `inactive` | Trial ended, or a paid subscription lapsed, with nothing active. |
 | `lifetime` | One-time $100 lifetime license, or the early-adopter grant. |
 
-Prices ($5/month, $100 lifetime) live in Stripe as Price objects. The `stripe_*`
-columns are populated later by the payments/webhook code; they are `NULL` until
-then.
+The $5/month plan lives in Stripe as a Product + recurring Price, created once
+with `make create-stripe-product` (see the repo README). The `stripe_*` columns
+are filled in by the `/webhooks/stripe` handler when a Checkout Session
+completes; they are `NULL` until the user subscribes.

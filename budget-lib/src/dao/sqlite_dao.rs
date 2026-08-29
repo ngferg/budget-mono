@@ -421,6 +421,43 @@ impl<CON: SqLiteConn> Dao for SqliteDao<CON> {
             updated_at,
         })
     }
+
+    fn activate_subscription(
+        &self,
+        req: &types::ActivateSubscriptionRequest,
+    ) -> Result<(), types::RecordCheckoutError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| types::RecordCheckoutError::Internal("Failed to lock conn".to_string()))?
+            .get_db(req.hashed_email.clone())
+            .map_err(|_| types::RecordCheckoutError::UserDoesntExists())?;
+
+        // COALESCE keeps whatever is already stored when the webhook could not
+        // supply a value (e.g. Stripe was unreachable for the period-end read).
+        // The `status <> 'lifetime'` guard means a one-time lifetime buyer is
+        // never downgraded to a monthly plan by a stray event.
+        conn.execute(
+            "UPDATE subscription SET \
+               status                   = 'active', \
+               stripe_customer_id       = COALESCE(?1, stripe_customer_id), \
+               stripe_subscription_id   = COALESCE(?2, stripe_subscription_id), \
+               stripe_payment_intent_id = COALESCE(?3, stripe_payment_intent_id), \
+               current_period_end       = COALESCE(?4, current_period_end), \
+               updated_at               = STRFTIME('%Y-%m-%dT%H:%M:%SZ', 'now') \
+             WHERE id = 1 AND status <> 'lifetime'",
+            rusqlite::params![
+                req.stripe_customer_id,
+                req.stripe_subscription_id,
+                req.stripe_payment_intent_id,
+                req.current_period_end,
+            ],
+        )
+        .map_err(|e| {
+            types::RecordCheckoutError::Internal(format!("Failed to activate subscription: {e}"))
+        })?;
+        Ok(())
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

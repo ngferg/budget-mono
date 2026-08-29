@@ -35,4 +35,10 @@ pub trait Dao {
         &self,
         req: &types::GetSubscriptionRequest,
     ) -> Result<types::Subscription, types::GetSubscriptionError>;
+    /// Marks the subscription `active` and records the Stripe identifiers from a
+    /// completed Checkout Session. A `lifetime` row is left untouched.
+    fn activate_subscription(
+        &self,
+        req: &types::ActivateSubscriptionRequest,
+    ) -> Result<(), types::RecordCheckoutError>;
 }

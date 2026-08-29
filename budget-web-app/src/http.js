@@ -6,7 +6,7 @@ export function httpErrorMessage(status) {
     case 401:
       return "Your session has expired. Please log in again.";
     case 402:
-      return "Your free trial has ended. Subscribe for $5/month, or pay $100 once for lifetime access, to keep using your budget.";
+      return "Your free trial has ended. Subscribe for $5/month to keep using your budget.";
     case 403:
       return "You don't have permission to do that.";
     case 404:
