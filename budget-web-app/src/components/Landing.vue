@@ -5,7 +5,8 @@
             <h2>Your Budget. Your Data. <span class="accent">No One Else's.</span></h2>
             <p class="hero-subtitle">
                 FeBudget is a private, open-source budgeting tool built from the ground up to keep your financial data
-                truly yours. No shared databases. Just a clean, fast way to manage your money.
+                truly yours. No shared databases. Just a clean, fast way to manage your money — free for your first
+                month, no credit card required.
             </p>
         </section>
 
@@ -61,7 +62,7 @@
                 <div class="feature-icon">🌐</div>
                 <h3>Fully Open Source</h3>
                 <p>
-                    Every line of code is public. Audit the privacy model yourself, self-host it, or contribute.
+                    Every line of code is public. Audit the privacy model yourself, or contribute.
                     No black boxes, no hidden behavior — just transparent software you can trust.
                     <a href="https://github.com/ngferg/budget-mono" target="_blank" class="source-link">View on GitHub
                         →</a>
@@ -88,6 +89,23 @@
                     </p>
                 </div>
             </div>
+        </section>
+
+        <!-- Pricing -->
+        <section class="pricing">
+            <h3>Free for a Month, Then $5</h3>
+            <p>
+                Every account starts with a <strong>full month free — no credit card required</strong>. Nothing on
+                file means nothing to forget to cancel, and no surprise charge when the month is up.
+            </p>
+            <p>
+                After the trial it's a flat <strong>$5/month</strong> — the same for everyone. No tiers, no upsells,
+                no ads. Payments are handled by Stripe, so FeBudget never sees your card details.
+            </p>
+            <p>
+                Change your mind any time. Cancel in one click and keep full access through the end of the period
+                you've already paid for.
+            </p>
         </section>
 
         <!-- Privacy Callout -->
@@ -241,6 +259,40 @@
 }
 
 .step strong {
+    color: #d1fae5;
+}
+
+/* Pricing */
+.pricing {
+    margin-top: 3rem;
+    background: linear-gradient(135deg, #0d2016 0%, #012305 100%);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 0 1px rgba(16, 185, 129, 0.1);
+}
+
+.pricing h3 {
+    color: #34d399;
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem;
+}
+
+.pricing p {
+    color: #a7f3d0;
+    font-size: 1rem;
+    line-height: 1.7;
+    max-width: 700px;
+    margin: 0 auto 0.9rem;
+}
+
+.pricing p:last-child {
+    margin-bottom: 0;
+}
+
+.pricing strong {
     color: #d1fae5;
 }
 
