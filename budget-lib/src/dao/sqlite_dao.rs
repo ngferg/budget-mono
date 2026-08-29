@@ -560,9 +560,14 @@ impl SqLiteConn for RealSqliteConn {
                     DaoError::FailedToCreate("Failed to create user database".to_string())
                 })?;
 
-                let ddl = std::fs::read_to_string(format!("{}/USER_DDL.sql", self.db_folder))
-                    .map_err(|_| DaoError::FailedToCreate("DDL sql is missing".to_string()))?;
-                conn.execute_batch(ddl.as_str())
+                // Baked into the binary so a new account's schema always matches
+                // the deployed code. (It used to be read from
+                // `$SQLITE_DB_PATH/USER_DDL.sql` at runtime, which silently drifted
+                // from the code whenever that file wasn't redeployed alongside a
+                // schema change.) Existing databases are still brought forward by
+                // dbs/migrations/apply.sh.
+                const USER_DDL: &str = include_str!("../../dbs/USER_DDL.sql");
+                conn.execute_batch(USER_DDL)
                     .map_err(|_| DaoError::FailedToCreate("Failed to execute DDL".to_string()))?;
                 Ok(())
             }
