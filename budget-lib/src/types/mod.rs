@@ -111,6 +111,34 @@ pub enum RecordCheckoutError {
     Internal(String),
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum CancelSubscriptionError {
+    #[error("User doesn't exists")]
+    UserDoesntExists(),
+    /// The account has no active paid subscription (still on trial, lifetime, or
+    /// already lapsed), so there is nothing to cancel.
+    #[error("There is no active paid subscription to cancel")]
+    NotCancelable(),
+    #[error("Stripe is not configured on the server")]
+    StripeNotConfigured(),
+    #[error("Stripe Error: {0}")]
+    Stripe(String),
+    #[error("Internal Error: {0}")]
+    Internal(String),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum SyncSubscriptionError {
+    /// The subscription-lifecycle event had no `hashed_email` in its metadata,
+    /// so it cannot be routed to an account.
+    #[error("Subscription event is not tied to an account")]
+    NoAccountReference(),
+    #[error("User doesn't exists")]
+    UserDoesntExists(),
+    #[error("Internal Error: {0}")]
+    Internal(String),
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct CreateUserRequest {
     pub hashed_email: String,
@@ -209,6 +237,36 @@ pub struct StartCheckoutRequest {
 pub struct CheckoutSessionResponse {
     /// Stripe-hosted Checkout URL the client should redirect the browser to.
     pub url: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct CancelSubscriptionRequest {
+    pub hashed_email: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct CancelSubscriptionResponse {
+    /// Date the user keeps access through, mirrored from Stripe.
+    pub current_period_end: Option<String>,
+    /// Always `true` after a successful cancel: the subscription stops renewing
+    /// but stays usable until `current_period_end`.
+    pub cancel_at_period_end: bool,
+}
+
+/// A Stripe `customer.subscription.updated` / `.deleted` webhook reduced to what
+/// the `subscription` row needs. Applied only when `stripe_subscription_id`
+/// matches the stored row, so stray events for other subscriptions are ignored.
+#[derive(Debug)]
+pub struct SyncSubscriptionRequest {
+    pub hashed_email: String,
+    pub stripe_subscription_id: String,
+    /// `true` for `customer.subscription.deleted` (or a `canceled` status): the
+    /// paid period is over, so move the row to `inactive`.
+    pub ended: bool,
+    /// Whether Stripe currently has the subscription set to stop renewing.
+    pub cancel_at_period_end: bool,
+    /// Paid-through date mirrored from Stripe, if the event carried one.
+    pub current_period_end: Option<String>,
 }
 
 /// Everything the webhook learned from a completed Checkout Session that needs
@@ -349,6 +407,10 @@ pub struct Subscription {
     pub trial_started_at: String,
     pub trial_ends_at: String,
     pub current_period_end: Option<String>,
+    /// Stripe has the subscription set to stop renewing at `current_period_end`.
+    /// Access continues until that date, so entitlement stays granted while it
+    /// is still in the future.
+    pub cancel_at_period_end: bool,
     // Populated by the (not-yet-written) Stripe payments code; never serialized
     // out to clients.
     #[serde(skip)]
@@ -363,7 +425,18 @@ pub struct Subscription {
 impl Subscription {
     pub fn entitlement(&self) -> Entitlement {
         match self.status {
-            SubscriptionStatus::Lifetime | SubscriptionStatus::Active => Entitlement::Entitled,
+            SubscriptionStatus::Lifetime => Entitlement::Entitled,
+            SubscriptionStatus::Active => {
+                // A subscription set to cancel keeps access only until the paid
+                // period runs out; past that it is effectively expired even if
+                // the `customer.subscription.deleted` webhook has not arrived
+                // yet to move the row to `inactive`.
+                if self.cancel_at_period_end && !self.paid_period_is_current() {
+                    Entitlement::Expired
+                } else {
+                    Entitlement::Entitled
+                }
+            }
             SubscriptionStatus::Inactive => Entitlement::Expired,
             SubscriptionStatus::FreeTrial => {
                 if self.trial_is_current() {
@@ -385,6 +458,20 @@ impl Subscription {
             Ok(ends_at) => chrono::Utc::now() < ends_at.with_timezone(&chrono::Utc),
             // An unparseable timestamp fails closed.
             Err(_) => false,
+        }
+    }
+
+    /// Whether the already-paid period still covers now. A missing
+    /// `current_period_end` is treated as "still current" so access is never cut
+    /// off on a date we could not read from Stripe; an unparseable one fails
+    /// closed.
+    fn paid_period_is_current(&self) -> bool {
+        match &self.current_period_end {
+            None => true,
+            Some(ends_at) => match chrono::DateTime::parse_from_rfc3339(ends_at) {
+                Ok(ends_at) => chrono::Utc::now() < ends_at.with_timezone(&chrono::Utc),
+                Err(_) => false,
+            },
         }
     }
 }
@@ -462,6 +549,7 @@ mod tests {
             trial_started_at: "2026-01-01T00:00:00Z".to_string(),
             trial_ends_at: trial_ends_at.to_string(),
             current_period_end: None,
+            cancel_at_period_end: false,
             stripe_customer_id: None,
             stripe_subscription_id: None,
             stripe_payment_intent_id: None,
@@ -491,6 +579,28 @@ mod tests {
             sub(SubscriptionStatus::FreeTrial, "2000-01-01T00:00:00Z").entitlement(),
             Entitlement::Expired
         );
+    }
+
+    #[test]
+    fn canceled_subscription_keeps_access_until_the_paid_period_ends() {
+        let mut s = sub(SubscriptionStatus::Active, "2000-01-01T00:00:00Z");
+        s.cancel_at_period_end = true;
+
+        s.current_period_end = Some("2999-01-01T00:00:00Z".to_string());
+        assert_eq!(s.entitlement(), Entitlement::Entitled);
+        assert!(s.has_access());
+
+        s.current_period_end = Some("2000-01-01T00:00:00Z".to_string());
+        assert_eq!(s.entitlement(), Entitlement::Expired);
+        assert!(!s.has_access());
+    }
+
+    #[test]
+    fn canceled_subscription_without_a_known_period_end_keeps_access() {
+        let mut s = sub(SubscriptionStatus::Active, "2000-01-01T00:00:00Z");
+        s.cancel_at_period_end = true;
+        s.current_period_end = None;
+        assert_eq!(s.entitlement(), Entitlement::Entitled);
     }
 
     #[test]

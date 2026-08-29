@@ -364,7 +364,8 @@ impl<CON: SqLiteConn> Dao for SqliteDao<CON> {
         let mut select_stmt = conn
             .prepare(
                 "SELECT status, trial_started_at, trial_ends_at, current_period_end, \
-                 stripe_customer_id, stripe_subscription_id, stripe_payment_intent_id, updated_at \
+                 cancel_at_period_end, stripe_customer_id, stripe_subscription_id, \
+                 stripe_payment_intent_id, updated_at \
                  FROM subscription WHERE id = 1",
             )
             .map_err(|e| {
@@ -380,10 +381,11 @@ impl<CON: SqLiteConn> Dao for SqliteDao<CON> {
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
                     row.get::<_, Option<String>>(3)?,
-                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, bool>(4)?,
                     row.get::<_, Option<String>>(5)?,
                     row.get::<_, Option<String>>(6)?,
-                    row.get::<_, String>(7)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, String>(8)?,
                 ))
             })
             .map_err(|e| match e {
@@ -400,6 +402,7 @@ impl<CON: SqLiteConn> Dao for SqliteDao<CON> {
             trial_started_at,
             trial_ends_at,
             current_period_end,
+            cancel_at_period_end,
             stripe_customer_id,
             stripe_subscription_id,
             stripe_payment_intent_id,
@@ -415,6 +418,7 @@ impl<CON: SqLiteConn> Dao for SqliteDao<CON> {
             trial_started_at,
             trial_ends_at,
             current_period_end,
+            cancel_at_period_end,
             stripe_customer_id,
             stripe_subscription_id,
             stripe_payment_intent_id,
@@ -436,10 +440,12 @@ impl<CON: SqLiteConn> Dao for SqliteDao<CON> {
         // COALESCE keeps whatever is already stored when the webhook could not
         // supply a value (e.g. Stripe was unreachable for the period-end read).
         // The `status <> 'lifetime'` guard means a one-time lifetime buyer is
-        // never downgraded to a monthly plan by a stray event.
+        // never downgraded to a monthly plan by a stray event. `cancel_at_period_end`
+        // is reset to 0 so a fresh checkout clears any earlier cancellation.
         conn.execute(
             "UPDATE subscription SET \
                status                   = 'active', \
+               cancel_at_period_end     = 0, \
                stripe_customer_id       = COALESCE(?1, stripe_customer_id), \
                stripe_subscription_id   = COALESCE(?2, stripe_subscription_id), \
                stripe_payment_intent_id = COALESCE(?3, stripe_payment_intent_id), \
@@ -455,6 +461,41 @@ impl<CON: SqLiteConn> Dao for SqliteDao<CON> {
         )
         .map_err(|e| {
             types::RecordCheckoutError::Internal(format!("Failed to activate subscription: {e}"))
+        })?;
+        Ok(())
+    }
+
+    fn sync_subscription(
+        &self,
+        req: &types::SyncSubscriptionRequest,
+    ) -> Result<(), types::SyncSubscriptionError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| types::SyncSubscriptionError::Internal("Failed to lock conn".to_string()))?
+            .get_db(req.hashed_email.clone())
+            .map_err(|_| types::SyncSubscriptionError::UserDoesntExists())?;
+
+        // Guarded by `stripe_subscription_id` so an event for some other (or a
+        // stale) subscription can never touch this row; `lifetime` is never
+        // downgraded. When `?2` (ended) is set the row moves to `inactive`,
+        // otherwise only the cancel flag and paid-through date are refreshed.
+        conn.execute(
+            "UPDATE subscription SET \
+               status               = CASE WHEN ?2 THEN 'inactive' ELSE status END, \
+               cancel_at_period_end = ?3, \
+               current_period_end   = COALESCE(?4, current_period_end), \
+               updated_at           = STRFTIME('%Y-%m-%dT%H:%M:%SZ', 'now') \
+             WHERE id = 1 AND status <> 'lifetime' AND stripe_subscription_id = ?1",
+            rusqlite::params![
+                req.stripe_subscription_id,
+                req.ended,
+                req.cancel_at_period_end,
+                req.current_period_end,
+            ],
+        )
+        .map_err(|e| {
+            types::SyncSubscriptionError::Internal(format!("Failed to sync subscription: {e}"))
         })?;
         Ok(())
     }

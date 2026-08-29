@@ -165,6 +165,109 @@ pub async fn record_completed_checkout(
     })
 }
 
+/// Schedules the caller's paid subscription to stop renewing. Access continues
+/// until the end of the already-paid period; Stripe then closes the subscription
+/// and the `customer.subscription.deleted` webhook moves the row to `inactive`.
+/// Idempotent: calling it again once cancellation is scheduled just echoes the
+/// current end date back.
+pub async fn cancel_subscription(
+    req: types::CancelSubscriptionRequest,
+) -> Result<types::CancelSubscriptionResponse, types::CancelSubscriptionError> {
+    use dao::Dao as dao_trait;
+
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
+        types::CancelSubscriptionError::Internal(format!("Failed to create sqlite dao: {e}"))
+    })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
+
+    let subscription = dao
+        .get_subscription(&types::GetSubscriptionRequest {
+            hashed_email: req.hashed_email.clone(),
+        })
+        .map_err(|e| match e {
+            types::GetSubscriptionError::UserDoesntExists()
+            | types::GetSubscriptionError::SubscriptionDoesntExists() => {
+                types::CancelSubscriptionError::UserDoesntExists()
+            }
+            types::GetSubscriptionError::Internal(msg) => {
+                types::CancelSubscriptionError::Internal(msg)
+            }
+        })?;
+
+    if subscription.status != types::SubscriptionStatus::Active {
+        return Err(types::CancelSubscriptionError::NotCancelable());
+    }
+    let subscription_id = subscription
+        .stripe_subscription_id
+        .clone()
+        .ok_or(types::CancelSubscriptionError::NotCancelable())?;
+
+    // Already scheduled to cancel: don't bother Stripe again, just report state.
+    if subscription.cancel_at_period_end {
+        return Ok(types::CancelSubscriptionResponse {
+            current_period_end: subscription.current_period_end,
+            cancel_at_period_end: true,
+        });
+    }
+
+    let client = stripe::StripeClient::from_env().map_err(|e| match e {
+        stripe::StripeError::MissingApiKey => types::CancelSubscriptionError::StripeNotConfigured(),
+        other => types::CancelSubscriptionError::Stripe(other.to_string()),
+    })?;
+    let updated = client
+        .cancel_subscription_at_period_end(&subscription_id)
+        .await
+        .map_err(|e| types::CancelSubscriptionError::Stripe(e.to_string()))?;
+
+    let current_period_end = updated
+        .period_end_rfc3339()
+        .or(subscription.current_period_end);
+
+    dao.sync_subscription(&types::SyncSubscriptionRequest {
+        hashed_email: req.hashed_email,
+        stripe_subscription_id: subscription_id,
+        ended: false,
+        cancel_at_period_end: true,
+        current_period_end: current_period_end.clone(),
+    })
+    .map_err(|e| types::CancelSubscriptionError::Internal(e.to_string()))?;
+
+    Ok(types::CancelSubscriptionResponse {
+        current_period_end,
+        cancel_at_period_end: true,
+    })
+}
+
+/// Applies a verified `customer.subscription.updated` / `.deleted` event. Routes
+/// to the account through the `hashed_email` stamped into the subscription's
+/// metadata at Checkout time; events without it (subscriptions predating that
+/// stamping) are reported as [`types::SyncSubscriptionError::NoAccountReference`]
+/// so the caller can still acknowledge them.
+pub async fn apply_subscription_lifecycle(
+    subscription: stripe::SubscriptionLifecycle,
+    ended: bool,
+) -> Result<(), types::SyncSubscriptionError> {
+    use dao::Dao as dao_trait;
+
+    let hashed_email = subscription
+        .hashed_email()
+        .map(str::to_string)
+        .ok_or(types::SyncSubscriptionError::NoAccountReference())?;
+
+    let conn = dao::sqlite_dao::RealSqliteConn::try_new().map_err(|e| {
+        types::SyncSubscriptionError::Internal(format!("Failed to create sqlite dao: {e}"))
+    })?;
+    let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
+
+    dao.sync_subscription(&types::SyncSubscriptionRequest {
+        hashed_email,
+        stripe_subscription_id: subscription.id.clone(),
+        ended: ended || subscription.has_ended(),
+        cancel_at_period_end: subscription.cancel_at_period_end,
+        current_period_end: subscription.period_end_rfc3339(),
+    })
+}
+
 pub async fn delete_user(
     del_user_request: types::DeleteUserRequest,
 ) -> Result<(), types::DeleteUserError> {
@@ -174,6 +277,35 @@ pub async fn delete_user(
         types::DeleteUserError::Internal(format!("Failed to create sqlite dao: {e}"))
     })?;
     let dao = dao::sqlite_dao::SqliteDao::new(Arc::new(Mutex::new(conn)));
+
+    // Cancel any live Stripe subscription before the database goes away:
+    // afterwards it would keep billing with no account behind it, and the
+    // metadata-routed `customer.subscription.*` webhooks would have nowhere to
+    // land. Best-effort — a Stripe failure is logged with the id for manual
+    // cleanup but does not stop the user from deleting their account.
+    if let Ok(subscription) = dao.get_subscription(&types::GetSubscriptionRequest {
+        hashed_email: del_user_request.hashed_email.clone(),
+    }) {
+        if let Some(subscription_id) = subscription.stripe_subscription_id {
+            match stripe::StripeClient::from_env() {
+                Ok(client) => {
+                    if let Err(e) = client.cancel_subscription_now(&subscription_id).await {
+                        eprintln!(
+                            "delete_user: failed to cancel Stripe subscription {subscription_id}; \
+                             cancel it manually in the dashboard: {e}"
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "delete_user: no Stripe client to cancel subscription {subscription_id} \
+                         ({e}); cancel it manually in the dashboard"
+                    );
+                }
+            }
+        }
+    }
+
     let _ = dao.delete_user(&del_user_request)?;
     Ok(())
 }

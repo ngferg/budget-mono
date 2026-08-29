@@ -1,0 +1,12 @@
+-- Adds the cancel_at_period_end flag to the subscription row. When a user
+-- cancels, Stripe keeps the subscription active until the paid period ends;
+-- this flag lets entitlement checks (and the UI) know access is winding down
+-- while `current_period_end` is still in the future. Keep in sync with
+-- dbs/USER_DDL.sql.
+--
+-- Unlike 0001/0002 this file is NOT self-idempotent: SQLite has no conditional
+-- ADD COLUMN, so re-running it errors. apply.sh's schema_migrations tracking is
+-- what guarantees it runs exactly once per database. (It is deliberately not
+-- added to 0001's CREATE TABLE: pre-monetization databases run 0001 and then
+-- this file, and a column already present there would make this ALTER fail.)
+ALTER TABLE subscription ADD COLUMN cancel_at_period_end INTEGER NOT NULL DEFAULT 0;

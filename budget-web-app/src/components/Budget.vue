@@ -11,6 +11,7 @@ const needs_subscription = ref(false);
 const starting_checkout = ref(false);
 const activating = ref(false);
 const checkout_notice = ref("");
+const subscription = ref(null);
 const budget = ref(null);
 const categories = ref(null);
 const year = ref(new Date().getFullYear());
@@ -122,6 +123,25 @@ const wait_for_activation = async () => {
     }
 };
 
+// Loads the subscription so the free-trial card can show the trial end date.
+// Non-fatal: on any failure the card just stays hidden. Managing an active
+// subscription (renewal date / cancel) lives on the Resources page.
+const fetch_subscription = async () => {
+    try {
+        const resp = await fetch(
+            API_BASE_URL +
+                "/users/subscription?hashed_email=" +
+                encodeURIComponent(store.get_hashed_email()),
+            { headers: { Authorization: store.get_token() } },
+        );
+        if (resp.status === 200) {
+            subscription.value = await resp.json();
+        }
+    } catch (e) {
+        console.error("Could not load subscription", e);
+    }
+};
+
 const start_checkout = async () => {
     starting_checkout.value = true;
     error.value = "";
@@ -156,6 +176,7 @@ onMounted(async () => {
     } else {
         await get_budget();
     }
+    await fetch_subscription();
 });
 
 const formatCents = (cents) => {
@@ -164,6 +185,18 @@ const formatCents = (cents) => {
         style: "currency",
         currency: "USD",
     }).format(cents / 100);
+};
+
+const format_date = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime())
+        ? ""
+        : d.toLocaleDateString(undefined, {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+          });
 };
 
 const delete_line_item = async (item_id) => {
@@ -661,6 +694,34 @@ const add_category = async () => {
         </div>
     </div>
 
+    <div
+        v-if="
+            subscription &&
+            subscription.entitlement === 'trialing' &&
+            !needs_subscription &&
+            !activating
+        "
+        class="card subscription-card"
+    >
+        <h3>Free trial</h3>
+        <p>
+            Your free trial runs through
+            <strong>{{ format_date(subscription.trial_ends_at) }}</strong>.
+            Subscribe to keep using your budget after that.
+        </p>
+        <button
+            class="subscribe-button"
+            :disabled="starting_checkout"
+            @click="start_checkout"
+        >
+            {{
+                starting_checkout
+                    ? "Redirecting to Stripe…"
+                    : "Subscribe — $5/month"
+            }}
+        </button>
+    </div>
+
     <Teleport to="body">
         <!-- backdrop -->
         <div
@@ -736,6 +797,16 @@ const add_category = async () => {
 .subscribe-button:disabled {
     opacity: 0.6;
     cursor: default;
+}
+
+.subscription-card h3 {
+    margin-top: 0;
+}
+
+.subscription-card p {
+    color: #a7f3d0;
+    line-height: 1.6;
+    margin: 0.5em 0 1em;
 }
 
 h1,

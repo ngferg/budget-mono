@@ -15,6 +15,62 @@ const downloadingCsv = ref(false);
 const loginCount = ref(null);
 const loginCountError = ref('');
 
+const subscription = ref(null);
+const subscriptionError = ref('');
+const canceling = ref(false);
+
+// Loads the subscription so paying users can see their renewal date and cancel.
+// Non-fatal: on failure the section just stays hidden.
+const fetchSubscription = async () => {
+    try {
+        const resp = await fetch(
+            API_BASE_URL + '/users/subscription?hashed_email=' + encodeURIComponent(store.get_hashed_email()),
+            { headers: { 'Authorization': store.get_token() } },
+        );
+        if (resp.status === 200) {
+            subscription.value = await resp.json();
+        }
+    } catch (e) {
+        console.error('Could not load subscription', e);
+    }
+};
+
+const cancelSubscription = async () => {
+    if (!window.confirm("Cancel your subscription? You'll keep full access until the end of the period you've already paid for.")) {
+        return;
+    }
+    canceling.value = true;
+    subscriptionError.value = '';
+    try {
+        const resp = await fetch(API_BASE_URL + '/users/subscription/cancel', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': store.get_token(),
+            },
+            body: JSON.stringify({ hashed_email: store.get_hashed_email() }),
+        });
+        if (resp.status === 200) {
+            subscription.value = { ...subscription.value, ...(await resp.json()) };
+            await fetchSubscription();
+        } else {
+            subscriptionError.value = httpErrorMessage(resp.status);
+        }
+    } catch (e) {
+        subscriptionError.value = 'An error occurred: ' + e.message;
+    } finally {
+        canceling.value = false;
+    }
+};
+
+const formatDate = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime())
+        ? ''
+        : d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+};
+
 const fetchLoginCount = async () => {
     console.log("Fetching login count for: " + store.get_email());
     loginCountError.value = '';
@@ -38,7 +94,10 @@ const fetchLoginCount = async () => {
     }
 };
 
-onMounted(fetchLoginCount);
+onMounted(() => {
+    fetchLoginCount();
+    fetchSubscription();
+});
 
 const deleteAccount = async () => {
     if (!deleteConfirm.value) {
@@ -173,6 +232,26 @@ const downloadCsv = async () => {
         <h3 class="text-2xl font-bold text-emerald-300 mt-6 mb-4 border-b-2 border-emerald-500 pb-2">Account
             Management:
         </h3>
+        <div v-if="subscription && subscription.status === 'active'"
+            class="account-management-section subscription-section">
+            <h4 class="section-title subscription-title">Subscription</h4>
+            <p v-if="subscription.cancel_at_period_end" class="section-desc">
+                Your subscription is cancelled. You'll keep full access until
+                <strong>{{ formatDate(subscription.current_period_end) || 'the end of your billing period' }}</strong>
+                and won't be charged again.
+            </p>
+            <template v-else>
+                <p class="section-desc">
+                    You're subscribed at $5/month.<span v-if="subscription.current_period_end"> Renews {{
+                        formatDate(subscription.current_period_end) }}.</span>
+                </p>
+                <p v-if="subscriptionError" class="delete-error">{{ subscriptionError }}</p>
+                <button class="delete-btn" @click="cancelSubscription" :disabled="canceling">
+                    {{ canceling ? 'Cancelling…' : 'Cancel Subscription' }}
+                </button>
+            </template>
+        </div>
+
         <div class="account-management-section data-export-section">
             <h4 class="section-title data-export-title">Data Export</h4>
             <p class="section-desc">Download your full budget history as a CSV file.</p>
@@ -363,6 +442,20 @@ li:hover .link-title {
     background: rgba(16, 185, 129, 0.06);
     border-color: rgba(16, 185, 129, 0.3);
     margin-bottom: 0.8em;
+}
+
+.subscription-section {
+    background: rgba(16, 185, 129, 0.06);
+    border-color: rgba(16, 185, 129, 0.3);
+    margin-bottom: 0.8em;
+}
+
+.subscription-title {
+    color: #6ee7b7;
+}
+
+.subscription-section .section-desc strong {
+    color: #34d399;
 }
 
 .data-export-section {

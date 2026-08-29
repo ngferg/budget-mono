@@ -33,6 +33,7 @@ to run after new accounts have been created.
 | ---- | ------- |
 | `0001_add_subscription.sql` | Adds the `subscription` table to pre-monetization databases. |
 | `0002_grandfather_existing_users.sql` | Grants `lifetime` status to every account that existed before monetization launched. |
+| `0003_add_subscription_cancellation.sql` | Adds the `cancel_at_period_end` column. Not self-idempotent (SQLite has no conditional `ADD COLUMN`); relies on the runner's tracking. |
 
 ## Subscription model
 
@@ -44,6 +45,11 @@ The `subscription` table holds one row (`id = 1`).
 | `active` | Paying $5/month via Stripe. `current_period_end` mirrors the paid-through date. |
 | `inactive` | Trial ended, or a paid subscription lapsed, with nothing active. |
 | `lifetime` | One-time $100 lifetime license, or the early-adopter grant. |
+
+`cancel_at_period_end = 1` marks an `active` row whose Stripe subscription is set
+to stop renewing. Access continues until `current_period_end`; after that the
+`customer.subscription.deleted` webhook moves `status` to `inactive`. A fresh
+Checkout resets the flag to `0`.
 
 The $5/month plan lives in Stripe as a Product + recurring Price, created once
 with `make create-stripe-product` (see the repo README). The `stripe_*` columns

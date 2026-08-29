@@ -1,0 +1,31 @@
+meta {
+  name: cancel subscription
+  type: http
+  seq: 11
+}
+
+post {
+  url: http://localhost:3000/users/subscription/cancel
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: {{token}}
+}
+
+body:json {
+  {
+    "hashed_email": "{{hashed_email}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.cancel_at_period_end: eq true
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

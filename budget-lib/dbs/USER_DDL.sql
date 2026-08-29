@@ -70,6 +70,10 @@ CREATE TABLE IF NOT EXISTS subscription (
   -- For an active monthly subscription: the end of the paid-through period,
   -- mirrored from Stripe so access can be checked without calling their API.
   current_period_end       TEXT,
+  -- Set to 1 when the user cancels: the subscription stops renewing but access
+  -- continues until current_period_end, after which the customer.subscription
+  -- .deleted webhook moves status to 'inactive'.
+  cancel_at_period_end     INTEGER NOT NULL DEFAULT 0,
   stripe_customer_id       TEXT,
   stripe_subscription_id   TEXT,
   stripe_payment_intent_id TEXT,
@@ -89,4 +93,5 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 INSERT INTO schema_migrations (name) VALUES
   ('0001_add_subscription.sql'),
-  ('0002_grandfather_existing_users.sql');
+  ('0002_grandfather_existing_users.sql'),
+  ('0003_add_subscription_cancellation.sql');

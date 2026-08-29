@@ -41,4 +41,11 @@ pub trait Dao {
         &self,
         req: &types::ActivateSubscriptionRequest,
     ) -> Result<(), types::RecordCheckoutError>;
+    /// Applies a Stripe subscription-lifecycle change (a cancel, a renewal, or
+    /// the subscription ending) to the row, but only when the stored
+    /// `stripe_subscription_id` matches. A `lifetime` row is left untouched.
+    fn sync_subscription(
+        &self,
+        req: &types::SyncSubscriptionRequest,
+    ) -> Result<(), types::SyncSubscriptionError>;
 }

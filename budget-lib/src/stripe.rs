@@ -87,6 +87,18 @@ impl StripeClient {
         Self::read_json(resp).await
     }
 
+    async fn delete(&self, path: &str) -> Result<serde_json::Value, StripeError> {
+        let resp = self
+            .http
+            .delete(format!("{STRIPE_API_BASE}{path}"))
+            .basic_auth(&self.secret_key, None::<&str>)
+            .header("Stripe-Version", STRIPE_VERSION)
+            .send()
+            .await
+            .map_err(|e| StripeError::Transport(e.to_string()))?;
+        Self::read_json(resp).await
+    }
+
     async fn read_json(resp: reqwest::Response) -> Result<serde_json::Value, StripeError> {
         let status = resp.status();
         let body = resp
@@ -157,6 +169,13 @@ impl StripeClient {
             ("line_items[0][quantity]", "1".to_string()),
             ("managed_payments[enabled]", "true".to_string()),
             ("client_reference_id", client_reference_id.to_string()),
+            // Stamp the account onto the subscription itself so later
+            // `customer.subscription.*` webhooks (which don't carry
+            // `client_reference_id`) can still be routed back to this database.
+            (
+                "subscription_data[metadata][hashed_email]",
+                client_reference_id.to_string(),
+            ),
             ("success_url", success_url.to_string()),
             ("cancel_url", cancel_url.to_string()),
         ];
@@ -195,6 +214,40 @@ impl StripeClient {
             })?;
         chrono::DateTime::from_timestamp(unix, 0)
             .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+    }
+
+    /// Tells Stripe to stop the subscription renewing. It stays active (and
+    /// usable) until the current paid period ends, then Stripe closes it and
+    /// sends `customer.subscription.deleted`. Returns the updated subscription so
+    /// the caller can mirror the cancel flag and paid-through date locally.
+    pub async fn cancel_subscription_at_period_end(
+        &self,
+        subscription_id: &str,
+    ) -> Result<SubscriptionLifecycle, StripeError> {
+        let body = self
+            .post_form(
+                &format!("/v1/subscriptions/{subscription_id}"),
+                &[("cancel_at_period_end", "true".to_string())],
+            )
+            .await?;
+        serde_json::from_value(body).map_err(|e| StripeError::Decode(e.to_string()))
+    }
+
+    /// Cancels a subscription immediately, with no remaining paid period. Used
+    /// when the account itself is being deleted, so there is nobody left to keep
+    /// access for. A subscription Stripe will not cancel because it is already
+    /// canceled or unknown (`400`/`404`) is treated as success.
+    pub async fn cancel_subscription_now(&self, subscription_id: &str) -> Result<(), StripeError> {
+        match self
+            .delete(&format!("/v1/subscriptions/{subscription_id}"))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(StripeError::Api {
+                status: 400 | 404, ..
+            }) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -239,6 +292,56 @@ pub struct CompletedCheckoutSession {
     pub subscription: Option<String>,
     #[serde(default)]
     pub payment_intent: Option<String>,
+}
+
+/// The fields we read off a `customer.subscription.*` webhook object (and the
+/// response to a cancel call, which has the same shape).
+#[derive(Debug, Deserialize)]
+pub struct SubscriptionLifecycle {
+    pub id: String,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub cancel_at_period_end: bool,
+    #[serde(default)]
+    pub current_period_end: Option<i64>,
+    /// Left raw: recent API versions moved `current_period_end` onto the items.
+    #[serde(default)]
+    pub items: Option<serde_json::Value>,
+    #[serde(default)]
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
+impl SubscriptionLifecycle {
+    /// The account this subscription belongs to, stamped into `metadata` when the
+    /// Checkout Session was created. `None` for subscriptions made before that
+    /// stamping existed.
+    pub fn hashed_email(&self) -> Option<&str> {
+        self.metadata.get("hashed_email").map(String::as_str)
+    }
+
+    /// Paid-through date formatted the way the `subscription` table stores
+    /// timestamps, checking both the top-level field and the per-item location.
+    pub fn period_end_rfc3339(&self) -> Option<String> {
+        let unix = self.current_period_end.or_else(|| {
+            self.items
+                .as_ref()?
+                .get("data")?
+                .get(0)?
+                .get("current_period_end")?
+                .as_i64()
+        })?;
+        chrono::DateTime::from_timestamp(unix, 0)
+            .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+    }
+
+    /// True when the subscription is over for good, not merely set to cancel.
+    pub fn has_ended(&self) -> bool {
+        matches!(
+            self.status.as_deref(),
+            Some("canceled") | Some("incomplete_expired")
+        )
+    }
 }
 
 /// Verifies the `Stripe-Signature` header against `secret` (Stripe's scheme:
@@ -399,5 +502,44 @@ mod tests {
         assert_eq!(session.client_reference_id.as_deref(), Some("abc123hash"));
         assert_eq!(session.subscription.as_deref(), Some("sub_123"));
         assert_eq!(session.payment_intent, None);
+    }
+
+    #[test]
+    fn parses_a_subscription_lifecycle_object() {
+        let object = serde_json::json!({
+            "id": "sub_123",
+            "status": "active",
+            "cancel_at_period_end": true,
+            "metadata": { "hashed_email": "abc123hash" },
+            "items": { "data": [{ "current_period_end": 1_800_000_000 }] },
+        });
+        let sub: SubscriptionLifecycle = serde_json::from_value(object).unwrap();
+        assert_eq!(sub.id, "sub_123");
+        assert!(sub.cancel_at_period_end);
+        assert!(!sub.has_ended());
+        assert_eq!(sub.hashed_email(), Some("abc123hash"));
+        let expected = chrono::DateTime::from_timestamp(1_800_000_000, 0)
+            .unwrap()
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string();
+        assert_eq!(sub.period_end_rfc3339(), Some(expected));
+    }
+
+    #[test]
+    fn subscription_lifecycle_reads_top_level_period_end_and_detects_end() {
+        let object = serde_json::json!({
+            "id": "sub_9",
+            "status": "canceled",
+            "current_period_end": 1_800_000_000,
+        });
+        let sub: SubscriptionLifecycle = serde_json::from_value(object).unwrap();
+        assert!(sub.has_ended());
+        assert!(!sub.cancel_at_period_end);
+        assert_eq!(sub.hashed_email(), None);
+        let expected = chrono::DateTime::from_timestamp(1_800_000_000, 0)
+            .unwrap()
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string();
+        assert_eq!(sub.period_end_rfc3339(), Some(expected));
     }
 }

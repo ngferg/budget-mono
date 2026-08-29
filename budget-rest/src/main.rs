@@ -31,6 +31,7 @@ async fn main() {
             "/users/subscription/checkout",
             post(create_checkout_session),
         )
+        .route("/users/subscription/cancel", post(cancel_subscription))
         .route("/webhooks/stripe", post(handle_stripe_webhook))
         .layer(cors);
 
@@ -283,6 +284,7 @@ async fn get_subscription(
                 "entitlement": sub.entitlement(),
                 "trial_ends_at": sub.trial_ends_at,
                 "current_period_end": sub.current_period_end,
+                "cancel_at_period_end": sub.cancel_at_period_end,
             });
             (http::StatusCode::OK, axum::Json(body))
         }
@@ -347,6 +349,58 @@ async fn create_checkout_session(
     }
 }
 
+/// Schedules the caller's paid subscription to stop renewing. They keep full
+/// access until the end of the billing period they have already paid for.
+async fn cancel_subscription(
+    headers: axum::http::HeaderMap,
+    axum::extract::Json(req): axum::extract::Json<budget_lib::types::CancelSubscriptionRequest>,
+) -> (http::StatusCode, axum::Json<serde_json::Value>) {
+    if let Err(e) = verify_auth(headers, req.hashed_email.as_str()).await {
+        return (
+            e,
+            axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+        );
+    }
+    match budget_lib::cancel_subscription(req).await {
+        Ok(res) => (
+            http::StatusCode::OK,
+            axum::Json(serde_json::to_value(res).unwrap_or_default()),
+        ),
+        Err(budget_lib::types::CancelSubscriptionError::UserDoesntExists()) => (
+            http::StatusCode::NOT_FOUND,
+            axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+        ),
+        Err(budget_lib::types::CancelSubscriptionError::NotCancelable()) => (
+            http::StatusCode::CONFLICT,
+            axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+        ),
+        Err(budget_lib::types::CancelSubscriptionError::StripeNotConfigured()) => {
+            eprintln!(
+                "Cancel requested but Stripe is not configured: set STRIPE_SECRET_KEY in this \
+                 service's environment"
+            );
+            (
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+            )
+        }
+        Err(budget_lib::types::CancelSubscriptionError::Stripe(msg)) => {
+            eprintln!("Stripe cancel error: {msg}");
+            (
+                http::StatusCode::BAD_GATEWAY,
+                axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+            )
+        }
+        Err(budget_lib::types::CancelSubscriptionError::Internal(msg)) => {
+            eprintln!("Cancel internal error: {msg}");
+            (
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::from_str("{}").unwrap_or_default()),
+            )
+        }
+    }
+}
+
 /// Receives Stripe webhooks. The body must be read raw so its bytes match what
 /// Stripe signed, so this handler takes `Bytes` rather than `Json`. A bad or
 /// missing signature is a `400`; anything we can't finish processing is a `500`
@@ -379,35 +433,65 @@ async fn handle_stripe_webhook(
         }
     };
 
-    if event.event_type != "checkout.session.completed" {
-        // Acknowledged but not acted on.
-        return http::StatusCode::OK;
-    }
+    match event.event_type.as_str() {
+        "checkout.session.completed" => {
+            let session: budget_lib::stripe::CompletedCheckoutSession =
+                match serde_json::from_value(event.data.object) {
+                    Ok(session) => session,
+                    Err(e) => {
+                        eprintln!("checkout.session.completed with unexpected shape: {e}");
+                        return http::StatusCode::BAD_REQUEST;
+                    }
+                };
 
-    let session: budget_lib::stripe::CompletedCheckoutSession =
-        match serde_json::from_value(event.data.object) {
-            Ok(session) => session,
-            Err(e) => {
-                eprintln!("checkout.session.completed with unexpected shape: {e}");
-                return http::StatusCode::BAD_REQUEST;
+            match budget_lib::record_completed_checkout(session).await {
+                Ok(()) => http::StatusCode::OK,
+                // Nothing actionable — acknowledge so Stripe stops retrying.
+                Err(budget_lib::types::RecordCheckoutError::NoAccountReference())
+                | Err(budget_lib::types::RecordCheckoutError::UserDoesntExists()) => {
+                    eprintln!(
+                        "checkout.session.completed {} could not be matched to an account",
+                        event.id
+                    );
+                    http::StatusCode::OK
+                }
+                Err(budget_lib::types::RecordCheckoutError::Internal(msg)) => {
+                    eprintln!("Failed to record checkout {}: {msg}", event.id);
+                    http::StatusCode::INTERNAL_SERVER_ERROR
+                }
             }
-        };
+        }
+        event_type @ ("customer.subscription.updated" | "customer.subscription.deleted") => {
+            let subscription: budget_lib::stripe::SubscriptionLifecycle =
+                match serde_json::from_value(event.data.object) {
+                    Ok(subscription) => subscription,
+                    Err(e) => {
+                        eprintln!("{event_type} with unexpected shape: {e}");
+                        return http::StatusCode::BAD_REQUEST;
+                    }
+                };
+            let ended = event_type == "customer.subscription.deleted";
 
-    match budget_lib::record_completed_checkout(session).await {
-        Ok(()) => http::StatusCode::OK,
-        // Nothing actionable — acknowledge so Stripe stops retrying.
-        Err(budget_lib::types::RecordCheckoutError::NoAccountReference())
-        | Err(budget_lib::types::RecordCheckoutError::UserDoesntExists()) => {
-            eprintln!(
-                "checkout.session.completed {} could not be matched to an account",
-                event.id
-            );
-            http::StatusCode::OK
+            match budget_lib::apply_subscription_lifecycle(subscription, ended).await {
+                Ok(()) => http::StatusCode::OK,
+                // No account to route to (e.g. a subscription created before we
+                // started stamping metadata) — acknowledge and move on.
+                Err(budget_lib::types::SyncSubscriptionError::NoAccountReference())
+                | Err(budget_lib::types::SyncSubscriptionError::UserDoesntExists()) => {
+                    eprintln!(
+                        "{event_type} {} could not be matched to an account",
+                        event.id
+                    );
+                    http::StatusCode::OK
+                }
+                Err(budget_lib::types::SyncSubscriptionError::Internal(msg)) => {
+                    eprintln!("Failed to apply {event_type} {}: {msg}", event.id);
+                    http::StatusCode::INTERNAL_SERVER_ERROR
+                }
+            }
         }
-        Err(budget_lib::types::RecordCheckoutError::Internal(msg)) => {
-            eprintln!("Failed to record checkout {}: {msg}", event.id);
-            http::StatusCode::INTERNAL_SERVER_ERROR
-        }
+        // Acknowledged but not acted on.
+        _ => http::StatusCode::OK,
     }
 }
 

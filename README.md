@@ -20,10 +20,22 @@ merchant of record and collects tax):
 
 - `POST /users/subscription/checkout` opens a Stripe Checkout Session for the
   $5/month plan and returns its hosted URL. The web app redirects here when the
-  API answers `402` (free trial lapsed).
-- `POST /webhooks/stripe` consumes `checkout.session.completed`, verifies the
-  signature, and flips the account to `active`, storing the Stripe
-  customer/subscription ids in the user's `subscription` row.
+  API answers `402` (free trial lapsed). The session stamps the account's
+  `hashed_email` into `subscription_data[metadata]` so later subscription
+  webhooks can be routed back to the right database.
+- `POST /users/subscription/cancel` sets the subscription to `cancel_at_period_end`
+  in Stripe. The row keeps `status = 'active'` and the `cancel_at_period_end`
+  flag is set; entitlement stays granted until `current_period_end` passes.
+- `DELETE /users` (account deletion) also cancels the Stripe subscription
+  immediately (best-effort — a Stripe failure is logged with the id but does not
+  block deletion) so a removed account can't keep billing.
+- `POST /webhooks/stripe` verifies the signature and then:
+  - `checkout.session.completed` — flips the account to `active` and stores the
+    Stripe customer/subscription ids.
+  - `customer.subscription.updated` — mirrors `cancel_at_period_end` and
+    `current_period_end` (covers cancels/renewals made from Stripe directly).
+  - `customer.subscription.deleted` — moves the row to `inactive` once the paid
+    period has fully ended.
 
 Setup:
 
